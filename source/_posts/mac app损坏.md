@@ -1,12 +1,12 @@
 ---
 title: MacOS提示"App已损坏你应该将它移到废纸篓"的多种解决方法
 date: 2021-04-29 11:00:00
-updated: 2021-04-29 11:00:00
-tags: 
-  - Macos
+updated: 2026-11-19 11:00:00
+tags:
+  - macOS
   - Helpdesk
   - 系统维护
-categories: 
+categories:
   - 桌面维护
   - 系统运维
 keywords: Mac OS, App损坏, 安全设置, 终端命令, 软件安装, 系统偏好设置

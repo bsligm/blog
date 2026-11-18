@@ -1,13 +1,13 @@
 ---
 title: 华为Atlas800服务器安装银河麒麟
 date: 2023-08-07 16:00:00
-updated: 2023-08-07 16:00:00
-tags: 
+updated: 2026-11-19 16:00:00
+tags:
   - 银河麒麟
   - 服务器
   - 华为
   - Atlas800
-categories: 
+categories:
   - 基础设施
   - 服务器管理
 keywords: Atlas800, 银河麒麟, 服务器安装, 华为服务器, NPU驱动, CANN框架
@@ -74,7 +74,7 @@ NPU（Neural Processing Unit）是昇腾AI处理器的核心组件，需要安�
 3. 根据产品系统架构在"软件分类"中勾选"910-aarch64"或"910-x86_64"
 4. 下载以下软件包：
    - Ascend-hdk-910-npu-driver_XXXXXX.run（驱动包）
-   - Ascend-hdk-910-npu-firmwarer_XXXXXX.run（固件包）
+   - Ascend-hdk-910-npu-firmware_XXXXXX.run（固件包）
 
 ![Ascend HDK软件下载](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202308071635608.png "Ascend HDK软件下载")
 
@@ -109,7 +109,7 @@ cd $path
 
 # 为驱动和固件文件添加可执行权限
 chmod +x Ascend-hdk-910-npu-driver_XXXXXX.run
-chmod +x Ascend-hdk-910-npu-firmwarer_XXXXXX.run
+chmod +x Ascend-hdk-910-npu-firmware_XXXXXX.run
 
 # 执行驱动完整安装
 ./Ascend-hdk-910-npu-driver_XXXXXX.run --FULL
@@ -121,7 +121,7 @@ sudo reboot
 npu-smi info
 
 # 执行固件安装
-./Ascend-hdk-910-npu-firmwarer_XXXXXX.run --FULL
+./Ascend-hdk-910-npu-firmware_XXXXXX.run --FULL
 
 # 再次重启系统
 sudo reboot

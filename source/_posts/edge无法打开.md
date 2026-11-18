@@ -1,12 +1,12 @@
 ---
 title: Edge浏览器无法打开网页提示兼容性问题的解决方案
 date: 2021-05-04 13:50:12
-updated: 2021-05-04 13:50:12
-tags: 
+updated: 2026-11-19 13:50:12
+tags:
   - Helpdesk
   - Windows
   - Edge浏览器
-categories: 
+categories:
   - 桌面维护
   - 系统运维
 keywords: Edge浏览器, 兼容性问题, 注册表, 组策略, 企业部署, 故障排除
@@ -46,7 +46,7 @@ Microsoft Edge是Windows 10/11系统默认的浏览器，但在某些情况下�
 
 依次打开以下注册表路径（如果路径不存在则需要新建）：
 
-```
+```text
 HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge
 ```
 

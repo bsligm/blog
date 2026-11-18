@@ -1,12 +1,12 @@
 ---
 title: Windows 10系统封装详细教程
 date: 2023-09-08 15:00:00
-updated: 2023-09-08 15:00:00
-tags: 
+updated: 2026-11-19 15:00:00
+tags:
   - Windows
   - 封装
   - 系统部署
-categories: 
+categories:
   - 系统运维
   - 基础设施
 keywords: Win10封装, 系统部署, 批量部署, 镜像制作, NTlite, Dism++, 系统优化
@@ -116,7 +116,7 @@ powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
 推荐安装以下实用插件：
 
 - **Adblock Plus**：广告屏蔽插件
-- **百度药丸**：优化百度搜索体验
+- **百度药丸**：搜索增强插件（优化百度搜索体验，非广告屏蔽）
 
 ![Adblock Plus安装](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202509081514393.png "Adblock Plus")
 
@@ -147,8 +147,6 @@ powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
 
 使用Dism++根据实际需求进行系统清理和功能优化：
 
-![Dism++优化](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202509081514056.png "Dism++优化界面")
-
 ---
 
 ## 系统封装
@@ -168,8 +166,8 @@ powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
 1. 删除了OOBE账户，启用Administrator账户
 2. 开启了卓越性能电源计划
 3. 配置了每天执行的存储感知功能
-4. 在Edge浏览器中安装了2个广告屏蔽插件
-5. 添加了.NET Framework 3.5和SMB 1.0协议
+4. 在Edge浏览器中安装了Adblock Plus与百度药丸插件
+5. 按需安装了功能组件（如.NET Framework 3.5、SMB 1.0协议等）
 
 以上修改可根据实际需求进行调整，制作出最符合自身情况的完美方案。
 

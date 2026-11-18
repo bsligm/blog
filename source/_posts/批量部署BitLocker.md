@@ -2,12 +2,12 @@
 title: Windows域环境下批量部署BitLocker
 date: 2023-02-22 11:00:00
 updated: 2023-02-22 11:00:00
-tags: 
+tags:
   - AD域控制器
   - Helpdesk
   - PowerShell
   - 安全
-categories: 
+categories:
   - 基础设施
   - 安全管理
 keywords: BitLocker, 批量部署, AD域, 组策略, TPM, 数据加密, 安全管理

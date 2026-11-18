@@ -1,12 +1,12 @@
 ---
 title: Windows沙盒 sandbox 实际应用案例
 date: 2023-03-04 11:00:00
-updated: 2023-03-04 11:00:00
-tags: 
+updated: 2026-11-19 11:00:00
+tags:
   - Windows 11
   - Helpdesk
   - 安全
-categories: 
+categories:
   - 基础设施
   - 安全管理
 keywords: Windows沙盒, Sandbox, 安全隔离, 虚拟化, Flash Player, IE浏览器
@@ -32,7 +32,7 @@ Windows沙盒是Windows 10 Pro/Enterprise和Windows 11 Pro/Enterprise版本中�
 
 - **临时性**：沙盒是一个临时的桌面环境，关闭后所有数据都会被清除
 - **隔离性**：沙盒与主机系统完全隔离，保护主机安全
-- **安全性**：运行在沙盒中的应用程序无法访问主机文件系统
+- **安全性**：运行在沙盒中的应用程序默认无法访问主机文件系统，仅可通过 `MappedFolders` 显式映射的目录例外
 - **便捷性**：无需复杂的虚拟机配置，一键启动
 
 官方文档参考：[Windows 沙盒配置 | Microsoft Learn](https://learn.microsoft.com/zh-cn/windows/security/threat-protection/windows-sandbox/windows-sandbox-configure-using-wsb-file)

@@ -1,14 +1,14 @@
 ---
 title: macOS 26测试版CrossOver Preview GPTK3一键更新脚本
 date: 2025-09-09 10:00:00
-updated: 2025-09-09 10:00:00
-tags: 
+updated: 2026-11-19 10:00:00
+tags:
   - macOS
   - CrossOver
   - Game Porting Toolkit
   - 游戏优化
   - 系统运维
-categories: 
+categories:
   - 系统运维
   - 游戏优化
 keywords: macOS 26, CrossOver Preview, GPTK3, 游戏移植工具包, 一键更新脚本, MetalFX, DLSS
@@ -66,6 +66,9 @@ copyright: true
 
 ```bash
 # 1. 创建脚本文件并复制以下完整脚本内容
+touch crossover-gptk3.sh
+vim crossover-gptk3.sh
+#粘贴下面脚本内容到脚本
 # 2. 添加执行权限
 chmod +x crossover-gptk3.sh
 
@@ -254,6 +257,15 @@ check_system_compatibility
 check_network_connectivity
 echo
 
+# 先确认安装目录存在，再判断是否需要提权（目录不存在时不可写，会误判为权限不足）
+if [ ! -d "${CROSSOVER_GPTK_DIR}" ]; then
+    log_operation "❌ 未找到CrossOver安装目录: ${CROSSOVER_GPTK_DIR}"
+    echo -e "${RED}错误：未找到CrossOver安装目录${NC}"
+    echo -e "${RED}预期路径：${CROSSOVER_GPTK_DIR}${NC}"
+    exit 1
+fi
+log_operation "✅ CrossOver安装目录验证成功"
+
 # 检查文件写入权限（优先避免使用sudo）
 SUDO=""
 if [ ! -w "${CROSSOVER_GPTK_DIR}" ]; then
@@ -267,15 +279,6 @@ if [ ! -w "${CROSSOVER_GPTK_DIR}" ]; then
         exit 1
     fi
 fi
-
-# 检查CrossOver安装
-if [ ! -d "${CROSSOVER_GPTK_DIR}" ]; then
-    log_operation "❌ 未找到CrossOver安装目录: ${CROSSOVER_GPTK_DIR}"
-    echo -e "${RED}错误：未找到CrossOver安装目录${NC}"
-    echo -e "${RED}预期路径：${CROSSOVER_GPTK_DIR}${NC}"
-    exit 1
-fi
-log_operation "✅ CrossOver安装目录验证成功"
 
 # 检查评估环境镜像
 if [ -z "${SOURCE_LIB_DIR}" ] || [ ! -d "${SOURCE_LIB_DIR}" ]; then

@@ -1,11 +1,11 @@
 ---
 title: Ubuntu安装英伟达驱动与CUDA
 date: 2023-11-09 11:40:00
-updated: 2023-11-09 11:40:00
-tags: 
+updated: 2026-11-19 11:40:00
+tags:
   - Ubuntu
   - Linux
-categories: 
+categories:
   - 系统运维
 keywords: Ubuntu, 英伟达驱动, CUDA, GPU, Linux驱动安装
 description: 详细介绍在Ubuntu系统中安装英伟达显卡驱动和CUDA工具包的完整步骤，包括驱动安装、CUDA配置和环境变量设置等关键环节。
@@ -130,15 +130,17 @@ sudo vim ~/.bashrc
 
 ```bash
 # CUDA环境变量配置（请根据实际安装路径调整）
-export PATH=/usr/local/cuda-12.2/bin${PATH:+:${PATH}}
-export LD_LIBRARY_PATH=/usr/local/cuda-12.2/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 export CUDA_HOME=/usr/local/cuda-12.2
+export PATH=$CUDA_HOME/bin${PATH:+:${PATH}}
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 ```
 
 使配置生效：
 
 ```bash
 source ~/.bashrc
+# 让动态链接器收录 CUDA 运行库目录
+echo "/usr/local/cuda-12.2/lib64" | sudo tee /etc/ld.so.conf.d/cuda.conf
 sudo ldconfig
 ```
 
@@ -160,14 +162,28 @@ nvcc -V
 
 如果驱动安装失败，可能的原因包括：
 - Secure Boot启用：需要在BIOS中禁用Secure Boot
-- 内核模块冲突：卸载开源nouveau驱动
+- Secure Boot启用：需要在BIOS中禁用Secure Boot，或使用签名的内核模块（MOK）
+- 内核模块冲突： nouveau 驱动与 NVIDIA 官方驱动冲突，需要先屏蔽 nouveau
 
-卸载nouveau驱动：
+屏蔽 nouveau 驱动（注意：屏蔽开源 nouveau 与卸载 NVIDIA 官方驱动是两件事，此处需要的是前者）：
 
 ```bash
-sudo apt remove --purge nvidia-*
+# 若此前装过 NVIDIA 官方驱动，先彻底卸载
+sudo apt remove --purge 'nvidia-*'
 sudo apt autoremove
 sudo apt autoclean
+
+# 屏蔽 nouveau 并重建 initramfs，随后重启生效
+echo -e "blacklist nouveau\noptions nouveau modeset=0" | sudo tee /etc/modprobe.d/blacklist-nouveau.conf
+sudo update-initramfs -u
+sudo reboot
+```
+
+重启后确认 nouveau 已不再加载：
+
+```bash
+lsmod | grep nouveau   # 无输出即为已屏蔽
+mokutil --sb-state     # 确认 Secure Boot 状态
 ```
 
 ### 2. CUDA版本不匹配

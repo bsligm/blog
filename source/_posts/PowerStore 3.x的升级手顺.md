@@ -2,10 +2,10 @@
 title: PowerStore 3.x的升级手顺
 date: 2023-07-28 09:40:00
 updated: 2023-07-28 09:40:00
-tags: 
+tags:
   - 存储
   - PowerStore
-categories: 
+categories:
   - 基础设施
 keywords: PowerStore, 升级, 存储, DELL EMC, 企业存储
 description: 详细介绍DELL EMC PowerStore 3.x版本的升级步骤，包括驱动器固件升级、无中断软件升级和PowerStore T型号软件升级等关键操作流程。

@@ -3,7 +3,7 @@
 ## Source: https://github.com/hexojs/hexo/
 
 # Site
-title: 127.0.0.1
+title: 李广明的技术博客
 subtitle: '专注IT技术分享'
 description: '李广明的技术博客，专注于Windows服务器、网络技术、系统集成等IT领域知识分享'
 keywords: 'Windows Server, AD域, 系统集成, 网络技术, IT运维, 服务器管理, 系统优化'
@@ -13,7 +13,8 @@ timezone: 'Asia/Shanghai'
 
 # URL
 ## Set your site url here. For example, if you use GitHub Page, set url as 'https://username.github.io/project'
-url: http://127.0.0.1:4000
+## 必须为线上正式地址：sitemap.xml、robots.txt 与 SEO 元数据都基于此值生成
+url: https://bsligm.zone
 permalink: :year/:month/:day/:title/
 permalink_defaults:
 pretty_urls:
@@ -122,3 +123,15 @@ search:
   field: post
   content: true
   limit: 10000
+
+# RSS feed
+## 主题首页 RSS 按钮与 <head> 中的 atom 链接均指向 /atom.xml
+feed:
+  type: atom
+  path: atom.xml
+  limit: 20
+  hub:
+  content: true
+  content_limit: 140
+  content_limit_delim: ' '
+  order_by: -date

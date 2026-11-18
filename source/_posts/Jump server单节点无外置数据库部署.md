@@ -1,12 +1,12 @@
 ---
 title: Jump server单节点无外置数据库部署
 date: 2023-10-18 13:40:00
-updated: 2023-10-18 13:40:00
-tags: 
+updated: 2026-11-19 13:40:00
+tags:
   - 基础设施
   - 堡垒机
   - 系统运维
-categories: 
+categories:
   - 系统运维
   - 安全管理
 keywords: JumpServer, 堡垒机, 单节点部署, 离线安装, Linux, 安全运维
@@ -52,7 +52,7 @@ sudo apt install wget curl tar gettext iptables
 
 ### 2. 安装包处理
 
-将下载的安装包移动到[/opt](file:///Users/liguangming/blog/bsligm/themes/matery/source/js)目录并解压：
+将下载的安装包移动到`/opt`目录并解压：
 
 ```bash
 # 移动安装包到/opt目录
@@ -139,7 +139,7 @@ MAGNUS_REDIS_PORT=63790
 
 ### 5. 验证安装
 
-安装完成后，JumpServer配置文件路径为：[/opt/jumpserver/config/config.txt](file:///Users/liguangming/blog/bsligm/config-example.txt)
+安装完成后，JumpServer配置文件路径为：`/opt/jumpserver/config/config.txt`
 
 常用管理命令：
 
@@ -225,7 +225,7 @@ cd /opt/jumpserver-offline-release-v3.7.2-amd64
 1. **密码安全**：定期更换管理员密码，使用复杂密码策略
 2. **访问控制**：严格控制访问JumpServer的IP范围
 3. **日志审计**：定期检查操作日志，发现异常行为
-4. **备份策略**：定期备份[/data/jumpserver](file:///data/jumpserver)目录下的数据
+4. **备份策略**：定期备份`/data/jumpserver`目录下的数据
 5. **版本更新**：关注JumpServer官方更新，及时升级到最新稳定版本
 
 ## 常见问题

@@ -93,13 +93,6 @@ xattr -lr /Applications/应用名称.app
 
 若上述方法均无效，才考虑文件本体损坏：从官方渠道重新下载，确保传输过程完整，并校验官方发布的校验值后再安装。
 
-## 安全建议
-
-1. **最小放开**：仅在确认来源可靠时处理，优先用方法三而不是全局关闭 Gatekeeper
-2. **及时恢复**：临时关闭后执行 `sudo spctl --master-enable` 恢复评估
-3. **官方渠道**：优先从开发者官网或 Mac App Store 获取
-4. **先验签再放行**：对关键软件先做签名与公证校验，再决定是否绕过
-
 ## 不同 macOS 版本的差异
 
 > 以下差异基于 macOS 10.15 Catalina 时代的实际行为整理，截至撰写时。Apple 在后续版本中持续收紧 Gatekeeper 并调整设置界面文案，新版上的具体开关位置与生效方式存在变化可能，实操以当前系统的实际界面为准。
@@ -107,12 +100,29 @@ xattr -lr /Applications/应用名称.app
 - **macOS 10.15 Catalina 及更高**：仅默认放行已签名且已公证的应用；「任何来源」需显式开启；对未公证应用的拦截更严格
 - **macOS 10.14 Mojave 及更早**：「任何来源」默认可见，安全评估相对宽松
 
-## 故障排除
+## 放行之前先确认拦截原因
 
-1. **重启系统**：刷新安全评估与策略缓存
-2. **核对系统版本与软件架构**：确认软件仍支持当前 macOS 与硬件架构（Intel / Apple 芯片）
-3. **查看系统日志**：用「控制台」应用查看拒绝启动时记录的 Gatekeeper 判定原因
-4. **联系开发者**：商业软件优先获取已公证的新版本，而不是长期绕过安全机制
+上面几种方法都在绕过判定，动手前值得先花一分钟看清 Gatekeeper 到底拒了什么，不同原因的处理方式完全不同：
+
+```bash
+spctl -a -vvv -t execute /Applications/应用名称.app
+codesign -dv --verbose=4 /Applications/应用名称.app 2>&1 | head -20
+```
+
+`spctl -a` 返回 `rejected` 时看后面的原因：涉及 `signature` 的拒绝说明包本身没有可用签名，走公证流程无望，只能显式放行或换版本；涉及公证（notarization）的拒绝说明签名有效但 Apple 没为这个版本做过公证，通常是开发者发布时漏了提交。
+
+`codesign` 用来判断绕过是否安全：签名有效且 TeamIdentifier 是开发者官方团队 ID 时，移除隔离属性的风险可控；若输出显示签名无效、`code object is not signed at all`，或只有 ad-hoc 签名，那这条报错就不是误拦，不该放行。
+
+需要系统侧的判定记录时，Gatekeeper 的判定过程记在 `syspolicyd` 的 `gk` 类别下：
+
+```bash
+log show --last 10m --style compact \
+  --predicate 'process == "syspolicyd" AND category == "gk"'
+```
+
+被拦时会看到 `rejecting due to lack of matching active rule` 这类行，放行则是 `rule N applies - allow=1`。比在「控制台」里翻筛更快，也留下可复制的证据。
+
+Intel 与 Apple 芯片的架构不匹配同样表现为启动失败，但报错文案不同（通常提示应用需要更新而非「已损坏」），不要混为一谈后再去动 Gatekeeper 设置。
 
 ## 总结
 

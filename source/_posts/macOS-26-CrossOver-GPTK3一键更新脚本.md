@@ -83,12 +83,17 @@ $SUDO mv wine "wine.backup.${BACKUP_TIMESTAMP}"
 ```
 
 ### 完整性验证
-脚本使用 MD5 校验确保所有复制文件的完整性：
+脚本逐个比对源文件与目标文件的摘要，优先用 `md5 -q`，没有则回退 `md5sum`：
 ```bash
-# MD5校验示例
-source_md5=$(md5 -q "$source_file" 2>/dev/null)
-target_md5=$(md5 -q "$target_file" 2>/dev/null)
+if command -v md5 >/dev/null 2>&1; then
+    source_md5=$(md5 -q "$source_file" 2>/dev/null)
+    target_md5=$(md5 -q "$target_file" 2>/dev/null)
+elif command -v md5sum >/dev/null 2>&1; then
+    source_md5=$(md5sum "$source_file" 2>/dev/null | cut -d' ' -f1)
+    target_md5=$(md5sum "$target_file" 2>/dev/null | cut -d' ' -f1)
 ```
+
+两个工具都不存在时脚本只打印「MD5 工具不可用，跳过校验」并继续，不会因此中止。也就是说跑完没报错不等于校验过——要确认完整性，得在日志里搜这一行有没有出现。
 
 ### MetalFX 配置
 自动处理 MetalFX 相关文件的重命名：
@@ -103,17 +108,13 @@ metalfx_files=(
 ## 使用建议与注意事项
 
 ### 权限管理
-脚本会优先避免使用 sudo 权限，仅在必要时提示用户授权，确保系统安全。
+脚本先测目录可写性再决定要不要提权：`[ ! -w "${CROSSOVER_GPTK_DIR}" ]` 成立才询问是否用 sudo，选 N 直接退出。CrossOver 由当前用户安装到 `/Applications` 时通常不需要提权；如果被 MDM 或安装器改过属主，才会走到这一支。提权只作用于应用包内的文件操作，容器目录（用户目录下）始终不提权。
 
 ### 版本时效
 本脚本按 GPTK 3.0 beta 3 的卷名与文件清单编写。Apple 更新 Game Porting Toolkit 后，挂载卷名、`redist/lib` 目录结构或文件名可能变化；此时脚本会因找不到评估环境或校验不过而中止，需按新版本实际内容重核后再调整。同理，CrossOver 升级会还原应用包内文件，升级后需重新运行本脚本。
 
 ### 日志记录
-所有操作都会记录在日志文件中，便于后续查看和故障排查：
-```bash
-# 日志文件路径示例
-LOG_FILE="/tmp/crossover-gptk3-$(date +%Y%m%d_%H%M%S).log"
-```
+日志路径形如 `/tmp/crossover-gptk3-<时间戳>.log`，由 `log_operation` 用 `tee -a` 同时输出到屏幕和文件，因此屏幕上看到的内容都在文件里，反之日志里还多了时间戳。文件在 `/tmp` 下，系统重启或定期清理后会丢失，需要留档就先拷走。
 
 ### 备份恢复
 如遇到问题，可通过以下命令恢复备份文件：
@@ -123,27 +124,17 @@ mv external.backup.${BACKUP_TIMESTAMP} external
 mv wine.backup.${BACKUP_TIMESTAMP} wine
 ```
 
-## 故障排除指南
+## 故障排除
 
-### 常见问题及解决方案
+**容器列表为空。** 脚本判定容器的依据是 `drive_c/windows/system32` 目录是否存在，只建了容器还没装任何 Windows 程序时该目录尚未生成，所以不会被列出；此时用手动输入完整路径绕过，或先在容器里装一次目标程序。
 
-1. **脚本权限问题**
-   - 确保脚本具有执行权限：`chmod +x crossover-gptk3.sh`
-   - 如提示权限不足，根据需要输入管理员密码
+**同一容器出现两个同名条目。** 脚本除了 `~/Library/Application Support/CrossOver/Bottles`，还会搜旧版路径 `~/.cxoffice`，旧版条目显示名会附加「 (旧版)」后缀。判重按容器路径而不是显示名，因此新旧同名容器都会被列出——按你的游戏实际所在的那个选，选错的那个不会得到更新但也不会被破坏。
 
-2. **容器检测失败**
-   - 确认 CrossOver 已正确安装
-   - 检查是否存在有效的游戏容器
-   - 可选择手动输入容器路径
+**提示未找到 CrossOver 安装目录。** 报错会打印脚本预期的路径，非默认安装位置需要改脚本顶部的 `CROSSOVER_GPTK_DIR`。
 
-3. **文件校验失败**
-   - 重新挂载评估环境镜像
-   - 确认镜像文件完整性
-   - 重新运行脚本
+**MD5 校验失败。** 这一步发生在复制完成之后，脚本此时不会自动还原，只汇总失败数并询问是否继续。选继续意味着应用包里留着摘要不符的文件，CrossOver 能不能正常启动取决于具体是哪个文件；稳妥做法是选退出，再按备份时间戳手工移回 `external.backup.<时间戳>` 与 `wine.backup.<时间戳>`，重新挂载评估环境镜像后重跑。
 
-4. **MetalFX 配置问题**
-   - 检查相关文件是否存在
-   - 确认 CrossOver 容器已启用 D3DMetal
+复制本身失败（`ditto` 报错或复制后目录缺失）走的是另一条路径：脚本会自己把备份移回去并退出，这种情况不需要手工恢复，直接排查镜像挂载后重跑即可。
 
 ## 完整脚本代码
 

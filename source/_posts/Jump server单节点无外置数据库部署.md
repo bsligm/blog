@@ -10,49 +10,62 @@ categories:
   - 系统运维
   - 安全管理
 keywords: JumpServer, 堡垒机, 单节点部署, 离线安装, Linux, 安全运维
-description: 详细介绍JumpServer堡垒机单节点无外置数据库的部署过程，包括环境准备、安装配置、LDAP对接、资产管理等完整操作步骤。
+description: JumpServer 堡垒机单节点无外置数据库的离线部署记录，涵盖环境准备、安装配置、LDAP 对接、资产管理与日常运维命令。
 cover: /medias/featureimages/4.jpg
 toc: true
 copyright: true
 ---
 
-# Jump server单节点无外置数据库部署
+JumpServer 是开源的运维安全审计系统（堡垒机），提供身份认证、账号管理、授权控制与操作审计四类能力。
 
-JumpServer是全球首款完全开源、符合4A规范的运维安全审计系统，提供了身份验证、账号管理、授权控制和安全审计等功能。本文将详细介绍JumpServer单节点无外置数据库的部署过程。
+本文记录**单节点 + 内置数据库**的离线部署方式：不引入外置 MySQL/Redis，由安装器自带容器承担持久化，适合运维规模有限、希望尽量少依赖的中小型环境。生产环境如需高可用或大容量录像存储，应改用外置数据库方案，部署参数与本流程不同。
+
+流程：基础设施要求 → 离线安装 → 系统配置（LDAP/资产/授权）→ 运维与安全建议。
 
 ## 基础设施要求
 
-在开始部署之前，请确保满足以下基础设施要求：
+部署前确认以下条件满足：
 
 ### 1. 硬件环境
-- Linux主机环境（推荐使用Ubuntu 20.04或CentOS 7.6及以上版本）
-- CPU：2核及以上
-- 内存：4GB及以上
-- 硬盘：50GB及以上可用空间
+
+- Linux 主机环境（推荐使用 Ubuntu 20.04 或 CentOS 7.6 及以上版本）
+- CPU：2 核及以上
+- 内存：4GB 及以上
+- 硬盘：50GB 及以上可用空间（录像与任务日志写入 `VOLUME_DIR`，实际应按审计保留期估算）
 
 ### 2. 网络环境
-- 可访问外网的网络环境（用于下载安装包）
-- 确保相关端口未被占用（80、2222、33061、33062、63790等）
+
+- 可访问外网的网络环境（仅用于下载安装包，离线环境可提前下载后拷入）
+- 确保相关端口未被占用（80、2222、33061、33062、63790 等）
 
 ### 3. 系统依赖
-安装必要的系统工具：
+
+安装必要的系统工具。以下命令以 Debian/Ubuntu 为例：
 
 ```bash
 sudo apt update
 sudo apt install wget curl tar gettext iptables
 ```
 
+RHEL/CentOS 系对应为：
+
+```bash
+sudo yum install -y wget curl tar gettext iptables
+```
+
+> 包名与包组名称随发行版版本存在差异（如较新版本使用 `dnf`，`iptables` 可能已被 `nftables` 替代），请以本机软件源实际提供的包为准。
+
 ## 部署过程
 
 ### 1. 下载安装包
 
-访问JumpServer官方下载页面，根据Linux主机CPU架构下载对应的离线安装包：
+访问 JumpServer 官方下载页面，根据 Linux 主机 CPU 架构下载对应的离线安装包：
 
-[JumpServer下载页面](https://community.fit2cloud.com/#/download/jumpserver/v3-7-2)
+[JumpServer 下载页面](https://community.fit2cloud.com/#/download/jumpserver/v3-7-2)
 
 ### 2. 安装包处理
 
-将下载的安装包移动到`/opt`目录并解压：
+将下载的安装包移动到 `/opt` 目录并解压：
 
 ```bash
 # 移动安装包到/opt目录
@@ -62,17 +75,23 @@ mv jumpserver-offline-installer-v*.tar.gz /opt
 cd /opt
 tar -xf jumpserver-offline-installer-v*.tar.gz
 
-# 进入解压后的目录
-cd jumpserver-offline-installer-v*
+# 以解压出的实际目录名为准，记录到变量后续复用
+JMS_DIR="$(ls -d /opt/jumpserver-offline-* | head -n1)"
+echo "安装目录: $JMS_DIR"
+cd "$JMS_DIR"
 ```
+
+> **目录名以解压结果为准**：不同版本的包名与解压出的目录名并不完全一致（例如离线包名为 `jumpserver-offline-installer-v*`，而解压出的目录可能是 `jumpserver-offline-release-v3.7.2-amd64`）。执行 `ls /opt` 确认真实目录名后再 `cd`，不要直接套用下文示例中的写死路径。下文统一以 `$JMS_DIR` 指代该目录。
 
 ### 3. 配置文件修改
 
-根据实际情况配置config文件，也可以不做任何修改使用默认配置：
+按需修改配置文件的参数，也可以不做任何修改使用默认配置：
 
 ```bash
 sudo vim config-example.txt
 ```
+
+> `config-example.txt` 只是安装期的输入模板，**安装器会据此生成实际生效的配置文件** `/opt/jumpserver/config/config.txt`。安装完成后如需调整参数，应修改后者并重启服务，改模板文件不会生效。
 
 #### 重要配置项说明
 
@@ -127,7 +146,7 @@ MAGNUS_REDIS_PORT=63790
 
 ### 4. 执行安装
 
-安装JumpServer（单节点，无外置数据库部署，全部选择n）：
+安装 JumpServer。交互安装向导会依次询问是否使用外置数据库、外置 Redis 等，本文采用单节点内置数据库部署，因此**这些问题全部选择 `n`**（即全部使用安装器自带的内置容器）。若误选 `y`，向导会转而要求填写外部数据库/Redis 的连接地址与凭据，与本文方案不符。
 
 ```bash
 # 安装
@@ -139,12 +158,12 @@ MAGNUS_REDIS_PORT=63790
 
 ### 5. 验证安装
 
-安装完成后，JumpServer配置文件路径为：`/opt/jumpserver/config/config.txt`
+安装完成后，实际生效的配置文件位于 `/opt/jumpserver/config/config.txt`（由安装期的 `config-example.txt` 生成）。
 
-常用管理命令：
+常用管理命令（在解压目录下执行）：
 
 ```bash
-cd /opt/jumpserver-offline-release-v3.7.2-amd64
+cd "$JMS_DIR"   # 上文解压得到的实际目录名
 
 # 启动
 ./jmsctl.sh start
@@ -159,35 +178,37 @@ cd /opt/jumpserver-offline-release-v3.7.2-amd64
 ./jmsctl.sh -h
 ```
 
-### 6. 访问JumpServer
+### 6. 访问 JumpServer
 
-安装成功后，通过浏览器访问JumpServer：
+安装成功后，通过浏览器访问 JumpServer：
 
-```
+```text
 地址: http://<JumpServer服务器IP地址>:<服务运行端口>
 用户名: admin
 密码: admin
 ```
 
-![JumpServer登录界面](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202310181002748.png "JumpServer登录界面")
+下图为登录入口，默认管理员账户即上述 `admin`：
 
-> **重要提示**：首次登录后请立即修改默认密码，确保系统安全。
+![JumpServer 登录界面](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202310181002748.png "JumpServer登录界面")
+
+> **重要提示**：`admin/admin` 是 JumpServer 的出厂默认账户，**仅首次登录有效**，首次登录后系统会强制要求修改密码。请在首次登录时立即改密，并避免把该账户用于日常运维——建议改为专用管理员账户并开启 MFA。
 
 ## 系统配置
 
-部署完成后需要进行系统配置，包括资产配置、用户管理、LDAP对接以及安全策略设置等。
+部署完成后还需完成基础配置，才能实际投入使用：统一认证（LDAP）、资产纳管、用户与用户组、权限授权。
 
-### 1. LDAP对接配置
+### 1. LDAP 对接配置
 
-通过LDAP对接可以实现与企业AD域的集成，统一用户认证：
+通过 LDAP 对接可与企业 AD 域集成，实现统一用户认证，避免在堡垒机内维护一套独立账号：
 
-1. 登录JumpServer管理后台
-2. 进入"系统设置" → "认证设置" → "LDAP设置"
-3. 配置LDAP服务器信息
+1. 登录 JumpServer 管理后台
+2. 进入"系统设置" → "认证设置" → "LDAP 设置"
+3. 配置 LDAP 服务器信息
 
-![LDAP设置步骤1](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202310181007029.png "LDAP设置界面")
+![LDAP 设置步骤 1](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202310181007029.png "LDAP设置界面")
 
-![LDAP设置步骤2](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202310181007281.png "LDAP同步设置")
+![LDAP 设置步骤 2](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202310181007281.png "LDAP同步设置")
 
 ### 2. 资产配置
 
@@ -195,7 +216,7 @@ cd /opt/jumpserver-offline-release-v3.7.2-amd64
 
 1. 点击"控制台" → "资产管理" → "资产列表"
 2. 点击"创建"按钮添加新资产
-3. 填写资产信息，包括IP地址、协议、端口等
+3. 填写资产信息，包括 IP 地址、协议、端口等
 
 ![创建资产信息](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202310181010659.png "资产创建界面")
 
@@ -204,7 +225,7 @@ cd /opt/jumpserver-offline-release-v3.7.2-amd64
 创建用户和用户组以便进行权限分配：
 
 1. 进入"用户管理" → "用户列表"
-2. 创建用户或从LDAP同步用户
+2. 创建用户或从 LDAP 同步用户
 3. 创建用户组并分配用户
 
 ![用户管理](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202310181014686.png "用户列表")
@@ -216,35 +237,40 @@ cd /opt/jumpserver-offline-release-v3.7.2-amd64
 根据业务需求对资产进行权限分配：
 
 1. 进入"控制台" → "权限管理" → "资产授权"
-2. 根据需求对资产文件夹、OU或单个资产对用户或用户组进行授权
+2. 根据需求对资产文件夹、OU 或单个资产对用户或用户组进行授权
 
 ![资产权限分配](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202310181017807.png "资产授权界面")
 
 ## 安全建议
 
-1. **密码安全**：定期更换管理员密码，使用复杂密码策略
-2. **访问控制**：严格控制访问JumpServer的IP范围
-3. **日志审计**：定期检查操作日志，发现异常行为
-4. **备份策略**：定期备份`/data/jumpserver`目录下的数据
-5. **版本更新**：关注JumpServer官方更新，及时升级到最新稳定版本
+1. **凭据安全**：定期更换管理员密码，启用复杂密码策略并为管理员账户开启 MFA。
+2. **访问控制**：严格限制可访问 JumpServer 的地址范围，管理后台不应直接暴露公网。
+3. **密钥一致性**：`SECRET_KEY` 与 `BOOTSTRAP_TOKEN` 是迁移与备份恢复的关键，务必离线留存；迁移到新环境时必须与旧环境保持一致，否则既有凭据密文无法解密。
+4. **日志审计**：定期检查登录与操作审计日志，关注共享账号与高危命令。
+5. **备份策略**：定期备份 `/data/jumpserver` 目录（含数据库、录像与配置），并**实际演练一次恢复**，不要只确认备份文件存在。
+6. **版本更新**：关注官方更新，升级前先备份数据库与配置，并阅读版本升级说明。
 
 ## 常见问题
 
 ### 1. 端口冲突
-如果默认端口被占用，需要修改config-example.txt中的端口配置。
+
+默认端口被占用时，修改**实际生效的配置文件** `/opt/jumpserver/config/config.txt` 中的端口项（`HTTP_PORT`、`SSH_PORT`、`MAGNUS_*_PORT`），随后重启服务；仅改安装目录下的 `config-example.txt` 不会生效。
 
 ### 2. 启动失败
-检查Docker服务是否正常运行，查看日志文件获取详细错误信息。
 
-### 3. LDAP同步失败
-确认LDAP服务器配置正确，网络连通性正常。
+先确认 Docker 服务正常（`systemctl status docker`、`docker ps -a`），查看异常容器的 `docker logs <容器名>` 定位报错。常见原因是端口被占用、`DOCKER_SUBNET` 与现有网段冲突，或磁盘空间不足。
+
+### 3. LDAP 同步失败
+
+依次核对：JumpServer 所在主机到 LDAP 服务器的网络与端口连通性、绑定账户的搜索权限、Base DN 与用户过滤条件是否匹配。若测试连接通过但同步不到用户，通常是过滤条件或 Base DN 范围问题，而不是凭据问题。
 
 ## 总结
 
-通过以上步骤，您已经成功部署了JumpServer单节点无外置数据库环境。JumpServer作为开源堡垒机解决方案，能够有效提升企业运维安全水平，实现操作审计和权限控制。
+至此，JumpServer 单节点无外置数据库环境部署完成，并已打通「AD 统一认证 → 资产纳管 → 用户组授权 → 操作审计」的基本闭环。该形态的优点是依赖少、部署快、备份点集中；代价是数据库与录像同盘同容器，不具备高可用能力。
 
-建议在生产环境中部署时：
-1. 使用HTTPS协议保护数据传输安全
-2. 配置高可用方案确保服务连续性
-3. 制定完善的权限管理策略
-4. 定期进行安全评估和漏洞扫描
+投产前建议：
+
+1. 配置 HTTPS 证书，避免明文传输会话与凭据。
+2. 评估是否需要外置数据库与高可用方案；单机形态需明确可接受的故障恢复时间。
+3. 按最小权限原则设计授权，避免把特权账号长期授予用户组。
+4. 定期执行安全评估与漏洞扫描，并把恢复演练纳入例行运维。

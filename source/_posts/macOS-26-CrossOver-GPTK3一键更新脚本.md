@@ -1,5 +1,5 @@
 ---
-title: macOS 26测试版CrossOver Preview GPTK3一键更新脚本
+title: macOS 26 测试版 CrossOver Preview GPTK3 一键更新脚本
 date: 2025-09-09 10:00:00
 updated: 2026-11-19 10:00:00
 tags:
@@ -12,55 +12,53 @@ categories:
   - 系统运维
   - 游戏优化
 keywords: macOS 26, CrossOver Preview, GPTK3, 游戏移植工具包, 一键更新脚本, MetalFX, DLSS
-description: 介绍一款针对macOS 26测试版与CrossOver Preview环境的一键更新脚本，用于替换Game Porting Toolkit 3文件，提升Windows游戏在macOS上的运行效果。
+description: 介绍一款针对 macOS 26 测试版与 CrossOver Preview 环境的一键更新脚本，用于替换 Game Porting Toolkit 3 文件，提升 Windows 游戏在 macOS 上的运行效果。
 cover: /medias/featureimages/1.jpg
 toc: true
 copyright: true
 ---
 
-# macOS 26测试版CrossOver Preview GPTK3一键更新脚本
+CrossOver Preview 在 macOS 26 测试版上尚未完全适配新的游戏移植能力，需手工用 Apple Game Porting Toolkit 3（GPTK3）的文件替换 CrossOver 内置的同名组件，并额外配置 MetalFX 相关文件。`crossover-gptk3.sh` 将这一过程自动化：校验环境、带时间戳备份、替换库文件、MD5 校验并在失败时回滚，最后按需把 DLL 复制进指定容器。
 
-在最新的macOS 26测试版中，苹果继续优化了对Windows游戏的支持。然而，CrossOver Preview版本可能尚未完全适配这些新特性。为了帮助用户更好地在macOS上运行Windows游戏，我开发了一款一键更新脚本，专门用于替换CrossOver中的Game Porting Toolkit 3 (GPTK3) 文件。
-
-## 脚本概述
-
-这款crossover-gptk3.sh脚本是一个完整的Shell脚本解决方案，旨在简化macOS 26测试版与CrossOver Preview环境中GPTK3文件的更新过程。通过自动化处理原本复杂的文件替换和配置过程，让用户能够轻松享受最新的游戏优化技术。
+适用范围：macOS 26 测试版 + CrossOver Preview + Game Porting Toolkit 3.0 beta 3。脚本会修改 CrossOver 应用包内文件，属于非官方改动，CrossOver 升级后需重新执行。
 
 ## 核心功能特性
 
 ### 1. 系统环境智能检测
 脚本启动时会自动检测当前系统环境：
-- macOS版本兼容性检查
+- macOS 版本兼容性检查
 - 网络连接状态验证
-- CrossOver安装目录验证
+- CrossOver 安装目录验证
 
 ### 2. 安全的文件操作机制
 - 自动备份原有文件（带时间戳）
-- 文件复制完整性验证（MD5校验）
-- 异常情况自动回滚机制
+- 文件复制完整性验证（MD5 校验）
+- 替换异常时用备份目录还原原有文件
 
-### 3. GPTK3文件更新
+### 3. GPTK3 文件更新
 - 自动检测评估环境镜像挂载路径
 - 核心库文件替换
-- 关键DLL文件验证
+- 关键 DLL 文件验证
 
-### 4. MetalFX支持配置
-- Unix端MetalFX文件配置
-- Windows端MetalFX文件配置
+### 4. MetalFX 支持配置
+- Unix 端 MetalFX 文件配置
+- Windows 端 MetalFX 文件配置
 - 性能优化支持
 
 ### 5. 容器智能管理
-- 自动搜索CrossOver容器
+- 自动搜索 CrossOver 容器
 - 手动容器路径配置
-- DLL文件自动复制到容器
+- DLL 文件自动复制到容器
 
 ## 脚本使用指南
 
 ### 前置条件
-1. 确保已安装CrossOver Preview版本
-2. 从[Apple开发者网站](https://developer.apple.com/games/game-porting-toolkit/)下载Game Porting Toolkit安装包
+1. 确保已安装 CrossOver Preview 版本
+2. 从[Apple 开发者网站](https://developer.apple.com/games/game-porting-toolkit/)下载 Game Porting Toolkit 安装包
 3. 挂载下载的安装包镜像
 4. 再次挂载"**Evaluation environment for Windows games 3.0 beta 3.dmg**"镜像
+
+前置条件中的版本号与本脚本验证过的 GPTK 3.0 beta 3 绑定：脚本按卷名前缀匹配挂载点，Apple 后续版本若变更卷名或 `redist/lib` 下的文件清单，需重核后再使用。
 
 ### 脚本执行步骤
 
@@ -80,7 +78,7 @@ chmod +x crossover-gptk3.sh
 
 脚本运行时会引导用户完成以下配置：
 
-1. **权限确认**：根据需要确认是否使用sudo权限
+1. **权限确认**：根据需要确认是否使用 sudo 权限
 2. **容器选择**：
    - 自动搜索并选择容器（推荐）
    - 手动输入容器名称
@@ -98,7 +96,7 @@ RED='\033[0;31m'     # 错误
 NC='\033[0m'         # 重置颜色
 ```
 
-脚本会检查macOS版本，对不同版本给出相应的提示信息，特别是对macOS 15及更高版本的兼容性提醒。
+脚本按主版本号分支提示：macOS 26 视为本脚本的目标验证环境；macOS 15 提示部分游戏功能可能不可用；高于 26 或未识别的版本提示兼容性未测试；低于 macOS 15 提示 GPTK3 支持可能不完整。
 
 ### 文件操作安全机制
 ```bash
@@ -111,15 +109,15 @@ $SUDO mv wine "wine.backup.${BACKUP_TIMESTAMP}"
 ```
 
 ### 完整性验证
-脚本使用MD5校验确保所有复制文件的完整性：
+脚本使用 MD5 校验确保所有复制文件的完整性：
 ```bash
 # MD5校验示例
 source_md5=$(md5 -q "$source_file" 2>/dev/null)
 target_md5=$(md5 -q "$target_file" 2>/dev/null)
 ```
 
-### MetalFX配置
-自动处理MetalFX相关文件的重命名：
+### MetalFX 配置
+自动处理 MetalFX 相关文件的重命名：
 ```bash
 # MetalFX文件列表
 metalfx_files=(
@@ -131,7 +129,10 @@ metalfx_files=(
 ## 使用建议与注意事项
 
 ### 权限管理
-脚本会优先避免使用sudo权限，仅在必要时提示用户授权，确保系统安全。
+脚本会优先避免使用 sudo 权限，仅在必要时提示用户授权，确保系统安全。
+
+### 版本时效
+本脚本按 GPTK 3.0 beta 3 的卷名与文件清单编写。Apple 更新 Game Porting Toolkit 后，挂载卷名、`redist/lib` 目录结构或文件名可能变化；此时脚本会因找不到评估环境或校验不过而中止，需按新版本实际内容重核后再调整。同理，CrossOver 升级会还原应用包内文件，升级后需重新运行本脚本。
 
 ### 日志记录
 所有操作都会记录在日志文件中，便于后续查看和故障排查：
@@ -157,7 +158,7 @@ mv wine.backup.${BACKUP_TIMESTAMP} wine
    - 如提示权限不足，根据需要输入管理员密码
 
 2. **容器检测失败**
-   - 确认CrossOver已正确安装
+   - 确认 CrossOver 已正确安装
    - 检查是否存在有效的游戏容器
    - 可选择手动输入容器路径
 
@@ -166,13 +167,13 @@ mv wine.backup.${BACKUP_TIMESTAMP} wine
    - 确认镜像文件完整性
    - 重新运行脚本
 
-4. **MetalFX配置问题**
+4. **MetalFX 配置问题**
    - 检查相关文件是否存在
-   - 确认CrossOver容器已启用D3DMetal
+   - 确认 CrossOver 容器已启用 D3DMetal
 
 ## 完整脚本代码
 
-以下是完整的crossover-gptk3.sh脚本代码：
+以下是完整的 crossover-gptk3.sh 脚本代码：
 
 ```bash
 #!/bin/bash
@@ -198,16 +199,21 @@ check_system_compatibility() {
     local macos_version=$(sw_vers -productVersion 2>/dev/null)
     if [[ -n "$macos_version" ]]; then
         local major_version=$(echo "$macos_version" | cut -d. -f1)
-        if [[ "$major_version" == "15" ]]; then
+        if [[ "$major_version" == "26" ]]; then
+            # macOS 26（本文目标测试环境）
+            log_operation "✅ 检测到 macOS 26，为本脚本目标测试环境"
+            echo -e "${GREEN}✅ 检测到 macOS 26，为本脚本目标测试环境${NC}"
+        elif [[ "$major_version" == "15" ]]; then
             # macOS 15 Sequoia (内核版本24.x)
             log_operation "⚠️ 检测到macOS 15 Sequoia，某些游戏功能可能不可用"
             echo -e "${YELLOW}⚠️ 检测到macOS 15 Sequoia，某些游戏功能可能不可用${NC}"
         elif [[ "$major_version" -ge "15" ]]; then
-            # 更新的macOS版本
-            log_operation "⚠️ 检测到较新的macOS版本 ($macos_version)，兼容性未完全测试"
-            echo -e "${YELLOW}⚠️ 检测到较新的macOS版本 ($macos_version)，兼容性未完全测试${NC}"
+            # macOS 15 以上、且非本文验证过的 26
+            log_operation "⚠️ 检测到未经验证的macOS版本 ($macos_version)，兼容性未测试"
+            echo -e "${YELLOW}⚠️ 检测到未经验证的macOS版本 ($macos_version)，兼容性未测试${NC}"
         else
-            log_operation "✅ macOS版本 ($macos_version) 兼容性良好"
+            log_operation "⚠️ macOS版本 ($macos_version) 低于 macOS 15，GPTK3 支持不完整"
+            echo -e "${YELLOW}⚠️ macOS ($macos_version) 低于 macOS 15，GPTK3 支持可能不完整${NC}"
         fi
     else
         log_operation "⚠️ 无法检测macOS版本，可能运行在非macOS系统上"
@@ -230,7 +236,7 @@ check_network_connectivity() {
 
 # 基础配置
 CROSSOVER_GPTK_DIR="/Applications/CrossOver.app/Contents/SharedSupport/CrossOver/lib64/apple_gptk"
-# 自动检测评估环境挂载路径
+# 自动检测评估环境挂载路径（卷名匹配按本脚本验证过的 3.0 beta 3，后续 GPTK 版本需重核卷名与文件清单）
 SOURCE_LIB_DIR=""
 for possible_path in "/Volumes/Evaluation environment for Windows games"*"/redist/lib" "/Volumes/Game evaluation"*"/redist/lib"; do
     if [ -d "$possible_path" ]; then
@@ -349,7 +355,7 @@ verify_file_integrity() {
     local source_file="$1"
     local target_file="$2"
     local relative_path="$3"
-    
+
     if [ -f "$source_file" ] && [ -f "$target_file" ]; then
         if command -v md5 >/dev/null 2>&1; then
             source_md5=$(md5 -q "$source_file" 2>/dev/null)
@@ -361,7 +367,7 @@ verify_file_integrity() {
             echo -e "${YELLOW}⚠️ MD5工具不可用，跳过校验${NC}"
             return 0
         fi
-        
+
         if [ "$source_md5" = "$target_md5" ] && [ -n "$source_md5" ]; then
             echo -e "${GREEN}  ✅ ${relative_path}${NC}"
             ((verified_count++))
@@ -390,10 +396,11 @@ key_files=(
 for key_file in "${key_files[@]}"; do
     source_file="${SOURCE_LIB_DIR}/${key_file}"
     target_file="${CROSSOVER_GPTK_DIR}/${key_file}"
-    
+
     if [ -f "$source_file" ]; then
-        verify_file_integrity "$source_file" "$target_file" "$key_file"
-        [ $? -ne 0 ] && verify_success=false
+        if ! verify_file_integrity "$source_file" "$target_file" "$key_file"; then
+            verify_success=false
+        fi
     fi
 done
 
@@ -402,16 +409,17 @@ echo -e "${YELLOW}验证所有动态库文件...${NC}"
 while IFS= read -r -d '' source_file; do
     relative_path="${source_file#${SOURCE_LIB_DIR}/}"
     target_file="${CROSSOVER_GPTK_DIR}/${relative_path}"
-    
-    verify_file_integrity "$source_file" "$target_file" "$relative_path"
-    [ $? -ne 0 ] && verify_success=false
-    
+
+    if ! verify_file_integrity "$source_file" "$target_file" "$relative_path"; then
+        verify_success=false
+    fi
+
 done < <(find "${SOURCE_LIB_DIR}" -type f \( -name "*.dll" -o -name "*.so" -o -name "*.dylib" \) -print0 2>/dev/null)
 
 # 显示验证结果
 echo -e "${YELLOW}📊 文件完整性验证结果：${NC}"
 echo -e "${GREEN}  ✅ 验证通过: ${verified_count} 个文件${NC}"
-if [ $failed_count -gt 0 ]; then
+if [ "$failed_count" -gt 0 ]; then
     echo -e "${RED}  ❌ 验证失败: ${failed_count} 个文件${NC}"
 fi
 
@@ -444,7 +452,7 @@ for metalfx_info in "${metalfx_files[@]}"; do
     temp="${metalfx_info#*:}"
     target_file="${temp%%:*}"
     file_type="${metalfx_info##*:}"
-    
+
     if [ -f "$source_file" ]; then
         log_operation "🔄 重命名${file_type}端MetalFX文件: $(basename "$source_file")"
         echo -e "${YELLOW}重命名${file_type}端MetalFX文件...${NC}"
@@ -483,7 +491,7 @@ auto_search_and_select_bottles() {
     echo -e "${YELLOW}🔍 正在搜索CrossOver容器...${NC}"
     local detected_bottles=()
     local detected_paths=()
-    
+
     # 搜索默认目录中的容器
     if [ -d "${DEFAULT_BOTTLES_DIR}" ]; then
         for bottle_dir in "${DEFAULT_BOTTLES_DIR}"/*; do
@@ -494,36 +502,44 @@ auto_search_and_select_bottles() {
             fi
         done
     fi
-    
+
     # 也搜索旧版路径
     if [ -d "${HOME}/.cxoffice" ]; then
         for bottle_dir in "${HOME}/.cxoffice"/*; do
             if [ -d "${bottle_dir}/drive_c/windows/system32" ]; then
                 local bottle_name=$(basename "$bottle_dir")
-                # 避免重复添加
-                if [[ ! " ${detected_bottles[@]} " =~ " ${bottle_name} " ]]; then
+                # 用容器路径判重：显示名会附加“ (旧版)”后缀，按名字比对会漏判新旧同名容器
+                local bottle_path="${bottle_dir}/drive_c"
+                local is_dup=false
+                for known_path in "${detected_paths[@]}"; do
+                    if [ "$known_path" = "$bottle_path" ]; then
+                        is_dup=true
+                        break
+                    fi
+                done
+                if [ "$is_dup" = false ]; then
                     detected_bottles+=("$bottle_name (旧版)")
-                    detected_paths+=("${bottle_dir}/drive_c")
+                    detected_paths+=("$bottle_path")
                 fi
             fi
         done
     fi
-    
+
     if [ ${#detected_bottles[@]} -eq 0 ]; then
         echo -e "${YELLOW}⚠️ 未检测到有效的CrossOver容器${NC}"
         echo -e "${YELLOW}请确保CrossOver已安装并创建了游戏容器${NC}"
         return 1
     fi
-    
+
     echo -e "${GREEN}📋 找到以下容器：${NC}"
     echo -e "  ${YELLOW}0.${NC} 跳过容器配置"
     for i in "${!detected_bottles[@]}"; do
         echo -e "  ${GREEN}$((i+1)).${NC} ${detected_bottles[i]}"
     done
-    
+
     while true; do
         read -p "请输入容器编号 (0-${#detected_bottles[@]}): " bottle_num
-        
+
         if [[ "$bottle_num" == "0" ]]; then
             echo -e "${YELLOW}已跳过容器配置${NC}"
             return 1
@@ -554,7 +570,7 @@ case $bottle_choice in
     2)
         # 手动输入容器名称
         read -p "请输入容器名称：" bottle_name
-        
+
         if [ -z "$bottle_name" ]; then
             echo -e "${RED}错误：容器名称不能为空${NC}"
         else
@@ -564,7 +580,7 @@ case $bottle_choice in
                 "${HOME}/.cxoffice/${bottle_name}/drive_c"
                 "${HOME}/Library/Application Support/CrossOver/${bottle_name}/drive_c"
             )
-            
+
             for path in "${possible_paths[@]}"; do
                 if [ -d "${path}/windows/system32" ]; then
                     WINE_PREFIX_DRIVEC="$path"
@@ -573,7 +589,7 @@ case $bottle_choice in
                     break
                 fi
             done
-            
+
             if [ -z "$WINE_PREFIX_DRIVEC" ]; then
                 echo -e "${RED}❌ 未找到容器「${bottle_name}」${NC}"
                 echo -e "${YELLOW}💡 建议使用选项1自动搜索容器${NC}"
@@ -604,20 +620,20 @@ esac
 if [ -n "$WINE_PREFIX_DRIVEC" ] && [ -d "${WINE_PREFIX_DRIVEC}/windows/system32" ]; then
     log_operation "💾 开始DLL文件复制到容器"
     echo -e "\n${YELLOW}正在复制DLL文件到容器...${NC}"
-    
+
     # DLL文件列表
     dll_list=(
         "nvngx.dll:NVIDIA DLSS支持库"
         "nvapi64.dll:NVIDIA API库"
     )
-    
+
     copy_success=true
     for dll_info in "${dll_list[@]}"; do
         dll_name="${dll_info%:*}"
         description="${dll_info#*:}"
         source_file="${CROSSOVER_WINE_WIN_DIR}/${dll_name}"
         target_file="${WINE_PREFIX_DRIVEC}/windows/system32/${dll_name}"
-        
+
         if [ -f "$source_file" ]; then
             if $SUDO cp "$source_file" "$target_file" 2>/dev/null; then
                 log_operation "✅ ${description} (${dll_name}) 复制成功"
@@ -633,7 +649,7 @@ if [ -n "$WINE_PREFIX_DRIVEC" ] && [ -d "${WINE_PREFIX_DRIVEC}/windows/system32"
             echo -e "${YELLOW}⚠️ ${description} (${dll_name}) 源文件不存在${NC}"
         fi
     done
-    
+
     if $copy_success; then
         log_operation "🎉 所有DLL文件复制完成"
         echo -e "${GREEN}🎉 所有DLL文件复制完成${NC}"
@@ -673,15 +689,9 @@ echo "${GREEN}•${NC} 查看日志命令：${YELLOW}cat ${LOG_FILE}${NC}"
 
 ## 总结
 
-这款crossover-gptk3.sh脚本通过自动化处理macOS 26测试版与CrossOver Preview环境中GPTK3文件的更新过程，大大简化了原本复杂的操作步骤。脚本内置了完善的安全机制、错误处理和日志记录功能，确保用户能够安全、可靠地完成文件更新。
+`crossover-gptk3.sh` 把 GPTK3 文件替换这件事从多步手工操作收敛为一次执行，并内置带时间戳备份、MD5 完整性校验、失败回滚与全量日志，替换出错时可据日志与备份目录恢复到改动前状态。
 
-通过使用此脚本，用户可以：
-- 轻松享受最新的游戏优化技术
-- 提升Windows游戏在macOS上的运行效果
-- 简化复杂的文件操作过程
-- 获得详细的日志记录和故障排查支持
-
-无论是新手还是经验丰富的用户，都可以通过这个脚本快速完成GPTK3文件的更新，享受更好的游戏体验。
+使用前请确认三项前置条件均已满足（CrossOver Preview 已安装、GPTK 安装包与评估环境镜像均已挂载），并在首次运行时留意容器选择环节——DLL 只会复制到所选容器，选错容器不会影响文件替换本身，但目标游戏不会获得更新。
 
 ---
 

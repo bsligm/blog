@@ -1,6 +1,9 @@
 ---
-title: "friends"
-type: tags
+title: "友人帐"
+date: 2021-05-06 11:00:00
+type: "friends"
 layout: "friends"
+sitemap: false
 ---
 
+友链名单正在整理，暂未开放申请。如果你也写技术博客并希望互换链接，欢迎通过[联系方式](/contact/)找我，附上站点名称与 RSS 地址即可。

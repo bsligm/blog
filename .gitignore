@@ -5,3 +5,5 @@ db.json
 node_modules/
 public/
 .deploy*/
+# 本机跨机迁移/归档备忘，与站点内容无关，不入库
+README-已转移.md

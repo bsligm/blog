@@ -1,7 +1,7 @@
 ---
 title: 华为 Atlas800 服务器安装银河麒麟
 date: 2023-08-07 16:00:00
-updated: 2026-11-19 16:00:00
+updated: 2026-11-19 15:30:00
 tags:
   - 银河麒麟
   - 服务器
@@ -11,7 +11,7 @@ categories:
   - 基础设施
   - 服务器管理
 keywords: Atlas800, 银河麒麟, 服务器安装, 华为服务器, NPU 驱动, CANN 框架
-description: 详细介绍华为 Atlas800 服务器安装银河麒麟操作系统的完整过程，包括通过 iBMC 安装系统、NPU 驱动安装和 CANN 框架配置等关键步骤。
+description: 华为 Atlas 800（aarch64）经 iBMC 虚拟介质安装银河麒麟，再依次装 NPU 驱动、固件与 CANN：三次重启的时序、驱动先装时的版本不匹配告警属预期，以及用 npu-smi 与 CANN 工具链分层验证（import torch 不能验证 CANN）。
 cover: /medias/featureimages/2.jpg
 toc: true
 copyright: true
@@ -48,7 +48,7 @@ iBMC（integrated Baseboard Management Controller）是华为服务器的集成�
 
 #### 步骤 3：挂载系统镜像
 
-1. 进入"虚拟控制台" → "镜像文件"
+1. 进入「虚拟控制台」→「镜像文件」
 2. 上传银河麒麟系统 ISO 镜像文件
 3. 设置从 CD/DVD 启动
 
@@ -73,7 +73,7 @@ NPU（Neural Processing Unit）是昇腾 AI 处理器的核心组件，需要安
 
 1. 登录[Ascend HDK](https://support.huawei.com/enterprise/zh/ascend-computing/ascend-hdk-pid-252764743/software)软件下载页面
 2. 选择 Ascend HDK 22.0.0 系列版本
-3. 根据产品系统架构在"软件分类"中勾选"910-aarch64"或"910-x86_64"
+3. 根据产品系统架构在「软件分类」中勾选 `910-aarch64` 或 `910-x86_64`
 4. 下载以下软件包：
    - Ascend-hdk-910-npu-driver_XXXXXX.run（驱动包）
    - Ascend-hdk-910-npu-firmware_XXXXXX.run（固件包）
@@ -103,13 +103,15 @@ sudo passwd HwHiAIUser
 
 ### 4. 安装驱动程序
 
-执行以下命令安装 NPU 驱动：
+以下命令中 `$path` 指驱动与固件 `.run` 包所在目录，先按其实际位置定义（本文示例为 `/opt/ascend/pkg`）：
 
 ```bash
+export path=/opt/ascend/pkg
+
 # 进入驱动与固件目录
 cd $path
 
-# 为驱动和固件文件添加可执行权限
+# 为驱动和固件文件添加可执行权限（XXXXXX 替换为下载包的实际版本号）
 chmod +x Ascend-hdk-910-npu-driver_XXXXXX.run
 chmod +x Ascend-hdk-910-npu-firmware_XXXXXX.run
 
@@ -142,7 +144,7 @@ CANN（Compute Architecture for Neural Networks）是华为昇腾 AI 处理器�
 
 ### 2. 传输安装包
 
-将 CANN 安装包复制到银河麒麟操作系统的指定路径`$path`
+将 CANN 安装包复制到前述 `$path` 目录（与驱动包同目录即可）
 
 ### 3. 安装依赖环境
 
@@ -173,17 +175,16 @@ sudo reboot
 
 ## 验证安装结果
 
-安装完成后，可以通过以下方式验证系统是否正常工作：
+按层次分三步验证，各步失败对应的故障面不同：
 
-1. 检查 NPU 状态：
+1. **设备在位**。`npu-smi info` 应列出全部 NPU，卡数与 `lspci | grep -i ascend` 的计数一致；卡数不足说明驱动或固件未正确加载。
+2. **CANN 工具链可用**。加载安装时生成的 `set_env.sh`（自定义安装路径时以实际路径为准），确认环境变量已注入、工具链目录非空：
    ```bash
-   npu-smi info
+   source /usr/local/Ascend/ascend-toolkit/set_env.sh
+   env | grep -i ascend
    ```
-
-2. 验证 CANN 框架：
-   ```bash
-   python3 -c "import torch; print(torch.__version__)"
-   ```
+   注意 CANN nnae 包本身不含 PyTorch，`python3 -c "import torch"` 成功与否与 CANN 是否装好无关，不能作为 CANN 的验证手段；需要 PyTorch 训练/推理时另行安装对应的昇腾适配层。
+3. **算例跑通**。用与当前 CANN 版本配套的官方 sample 跑一次最小的算子编译与执行（样例包需按版本号在华为支持站点另行下载），这一步通过才算业务可用的环境。
 
 ## 注意事项
 
@@ -194,7 +195,7 @@ sudo reboot
 
 ## 总结
 
-这台 Atlas 800 的交付顺序是：iBMC 挂镜像装银河麒麟 → 建 `HwHiAIUser` → 装 NPU 驱动 → 装固件 → 装 CANN → `npu-smi info` 与 `import torch` 验证。全程有三次重启（驱动、固件、CANN 各一次），规划停机窗口时别只算一次。
+这台 Atlas 800 的交付顺序是：iBMC 挂镜像装银河麒麟 → 建 `HwHiAIUser` → 装 NPU 驱动 → 装固件 → 装 CANN → 依次以 `npu-smi info`、CANN 工具链、官方算例三层验证。全程有三次重启（驱动、固件、CANN 各一次），规划停机窗口时别只算一次。
 
 几个只有踩过才会记住的点：
 
@@ -202,4 +203,4 @@ sudo reboot
 - **`HwHiAIUser` 先建好再动手**。驱动要以该用户身份运行，用户必须在执行安装脚本之前建好；root 直装完再补建用户，已落盘目录的属主不会自动修正，后续以该用户启动的任务会因权限不足失败。
 - **aarch64 的软件源包名与 x86 不同**，Python/pip 依赖按源内实际包名确认，别照搬 x86 手册。
 
-装完只是有了硬件通道。`npu-smi info` 出表和 Python 能 import 只证明驱动与框架加载成功，不代表业务模型能跑；投产前应当用目标模型跑一轮完整的推理或训练任务，同时把固件版本、驱动版本、CANN 版本一并记入资产台账——后续任何一次升级都要以这三个号为基准判断兼容性。
+装完只是有了硬件通道。`npu-smi info` 出表只证明驱动与固件加载成功，业务模型能不能跑还得用目标模型跑一轮完整的推理或训练才算数。也是在这一步，把固件、驱动、CANN 三个版本号一并记进资产台账——以后判断任何一次升级是否可行，依据的就是这三个号。

@@ -1,7 +1,7 @@
 ---
 title: Edge 浏览器无法打开网页提示兼容性问题的解决方案
 date: 2021-05-04 13:50:12
-updated: 2026-11-19 13:50:12
+updated: 2026-11-19 15:30:00
 tags:
   - Helpdesk
   - Windows
@@ -28,7 +28,7 @@ Windows 10/11 上的 Microsoft Edge 在部分终端启动后，任意网页都�
 
 ## 问题分析
 
-提示把它描述成"兼容性问题"，但真实触发点是 Edge 渲染进程的代码完整性检查（Renderer Code Integrity）：渲染器代码未通过完整性校验时，进程走 Windows 的快速失败（fast-fail）路径被强制终止，因此表现与字面意义上的页面兼容性无关。
+提示把它描述成「兼容性问题」，但真实触发点是 Edge 渲染进程的代码完整性检查（Renderer Code Integrity）：渲染器代码未通过完整性校验时，进程走 Windows 的快速失败（fast-fail）路径被强制终止，因此表现与字面意义上的页面兼容性无关。
 
 常见诱因：
 
@@ -88,7 +88,7 @@ HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge
 操作步骤：
 
 1. 右键点击目标组织单位（OU）
-2. 选择"在这个域中创建 GPO 并在此处链接"，按用途命名
+2. 选择「在这个域中创建 GPO 并在此处链接」，按用途命名
 3. 按注册表位置决定放在计算机配置还是用户配置。本例写入 `HKEY_LOCAL_MACHINE`，两者都能下发，但计算机配置对整机生效更稳定
 
 ### 3. 配置组策略
@@ -125,7 +125,7 @@ gpupdate /force
 
 若上述操作后问题仍在，按顺序继续排查：
 
-1. **重置 Edge 浏览器**：打开 Edge 设置，选择"重置设置" → "将设置恢复到默认值"
+1. **重置 Edge 浏览器**：打开 Edge 设置，选择「重置设置」 → 「将设置恢复到默认值」
 2. **清除浏览器缓存**：按 `Ctrl+Shift+Delete` 打开清除浏览数据界面，选择所有时间范围与全部数据类型后清除
 3. **检查安全软件**：临时禁用第三方安全软件，确认是否为注入拦截所致。这是定位手段，验证后需按企业策略恢复防护
 
@@ -137,6 +137,6 @@ sfc /scannow
 
 ## 总结
 
-把 `HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge` 下的 `RendererCodeIntegrityEnabled` 置为 `0`，可关闭 Edge 渲染器代码完整性检查，恢复"任意网页都提示兼容性问题"的故障。该手段绕过的是触发点，若根因是安全软件注入仍需从注入源处理，并在 Edge 升级后复验。
+把 `HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge` 下的 `RendererCodeIntegrityEnabled` 置为 `0`，可关闭 Edge 渲染器代码完整性检查，恢复「任意网页都提示兼容性问题」的故障。该手段绕过的是触发点，若根因是安全软件注入仍需从注入源处理，并在 Edge 升级后复验。
 
 企业环境优先用独立 GPO 定向下发到受影响 OU，不要写入默认域策略；下发后以 `gpupdate /force` 加注册表回读确认真的生效，而非只看 GPO 创建成功。

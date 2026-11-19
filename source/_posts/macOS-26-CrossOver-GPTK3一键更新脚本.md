@@ -1,7 +1,7 @@
 ---
 title: macOS 26 测试版 CrossOver Preview GPTK3 一键更新脚本
 date: 2025-09-09 10:00:00
-updated: 2026-11-19 10:00:00
+updated: 2026-11-19 15:30:00
 tags:
   - macOS
   - CrossOver
@@ -18,37 +18,11 @@ toc: true
 copyright: true
 ---
 
-CrossOver Preview 在 macOS 26 测试版上尚未完全适配新的游戏移植能力，需手工用 Apple Game Porting Toolkit 3（GPTK3）的文件替换 CrossOver 内置的同名组件，并额外配置 MetalFX 相关文件。`crossover-gptk3.sh` 将这一过程自动化：校验环境、带时间戳备份、替换库文件、MD5 校验并在失败时回滚，最后按需把 DLL 复制进指定容器。
+CrossOver Preview 在 macOS 26 测试版上尚未完全适配新的游戏移植能力，需手工用 Apple Game Porting Toolkit 3（GPTK3）的文件替换 CrossOver 内置的同名组件，并额外配置 MetalFX 相关文件。`crossover-gptk3.sh` 将这一过程自动化：校验环境、带时间戳备份、替换库文件、MD5 校验，出错时用备份回滚，最后按需把 DLL 复制进指定容器。
+
+脚本的保护机制都能事后核验：`external` 与 `wine` 先 `mv` 成 `*.backup.<时间戳>` 再复制新文件，任一改名失败即退出，此时按同一时间戳手工移回即可（两者按先后顺序改名，失败时可能只有一个已改名）。复制新文件失败、或复制后这两个目录缺失，脚本立即用备份还原；MD5 校验失败则不自动还原，只汇总失败数并询问是否继续，要继续还是回滚由你决定。全部操作追加写入 `/tmp/crossover-gptk3-<时间戳>.log`，出问题时以这份日志和备份目录为准，不要凭屏幕提示猜改了哪些文件。
 
 适用范围：macOS 26 测试版 + CrossOver Preview + Game Porting Toolkit 3.0 beta 3。脚本会修改 CrossOver 应用包内文件，属于非官方改动，CrossOver 升级后需重新执行。
-
-## 核心功能特性
-
-### 1. 系统环境智能检测
-脚本启动时会自动检测当前系统环境：
-- macOS 版本兼容性检查
-- 网络连接状态验证
-- CrossOver 安装目录验证
-
-### 2. 安全的文件操作机制
-- 自动备份原有文件（带时间戳）
-- 文件复制完整性验证（MD5 校验）
-- 替换异常时用备份目录还原原有文件
-
-### 3. GPTK3 文件更新
-- 自动检测评估环境镜像挂载路径
-- 核心库文件替换
-- 关键 DLL 文件验证
-
-### 4. MetalFX 支持配置
-- Unix 端 MetalFX 文件配置
-- Windows 端 MetalFX 文件配置
-- 性能优化支持
-
-### 5. 容器智能管理
-- 自动搜索 CrossOver 容器
-- 手动容器路径配置
-- DLL 文件自动复制到容器
 
 ## 脚本使用指南
 
@@ -56,7 +30,7 @@ CrossOver Preview 在 macOS 26 测试版上尚未完全适配新的游戏移植�
 1. 确保已安装 CrossOver Preview 版本
 2. 从[Apple 开发者网站](https://developer.apple.com/games/game-porting-toolkit/)下载 Game Porting Toolkit 安装包
 3. 挂载下载的安装包镜像
-4. 再次挂载"**Evaluation environment for Windows games 3.0 beta 3.dmg**"镜像
+4. 再次挂载 `Evaluation environment for Windows games 3.0 beta 3.dmg` 镜像
 
 前置条件中的版本号与本脚本验证过的 GPTK 3.0 beta 3 绑定：脚本按卷名前缀匹配挂载点，Apple 后续版本若变更卷名或 `redist/lib` 下的文件清单，需重核后再使用。
 
@@ -691,7 +665,7 @@ echo "${GREEN}•${NC} 查看日志命令：${YELLOW}cat ${LOG_FILE}${NC}"
 
 `crossover-gptk3.sh` 把 GPTK3 文件替换这件事从多步手工操作收敛为一次执行，并内置带时间戳备份、MD5 完整性校验、失败回滚与全量日志，替换出错时可据日志与备份目录恢复到改动前状态。
 
-使用前请确认三项前置条件均已满足（CrossOver Preview 已安装、GPTK 安装包与评估环境镜像均已挂载），并在首次运行时留意容器选择环节——DLL 只会复制到所选容器，选错容器不会影响文件替换本身，但目标游戏不会获得更新。
+使用前请确认三项前置条件均已满足（CrossOver Preview 已安装、GPTK 安装包与评估环境镜像均已挂载），并在首次运行时留意容器选择环节：DLL 只会复制到所选容器，选错容器不影响文件替换本身，但目标游戏不会获得更新。
 
 ---
 

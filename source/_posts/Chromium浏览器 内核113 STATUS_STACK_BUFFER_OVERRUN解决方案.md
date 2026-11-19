@@ -1,7 +1,7 @@
 ---
 title: Chromium 内核 113 STATUS_STACK_BUFFER_OVERRUN 解决方案
 date: 2023-05-18 11:00:00
-updated: 2026-11-19 11:00:00
+updated: 2026-11-19 15:30:00
 tags:
   - Chromium
   - 浏览器
@@ -18,22 +18,22 @@ toc: true
 copyright: true
 ---
 
-2023 年 5 月 Chromium 内核升级到 v113 后，部分终端上的 Chrome/Edge 无法启动，页面或进程直接返回"喔唷，崩溃了"与 `STATUS_STACK_BUFFER_OVERRUN`。该问题在域内环境中会批量出现，直接阻断依赖浏览器的业务系统入口。
+2023 年 5 月 Chromium 内核升级到 v113 后，部分终端上的 Chrome/Edge 无法启动，页面或进程直接返回「喔唷，崩溃了」与 `STATUS_STACK_BUFFER_OVERRUN`。该问题在域内环境中会批量出现，直接阻断依赖浏览器的业务系统入口。
 
 ## 问题描述
 
 崩溃时的两类表现：
 
-- 标签页提示"喔唷，崩溃了，此网页出现问题"
+- 标签页提示「喔唷，崩溃了，此网页出现问题」
 - 进程异常终止，错误码 `STATUS_STACK_BUFFER_OVERRUN`
 
-微软社区讨论中把它描述为"堆栈溢出"，但 `STATUS_STACK_BUFFER_OVERRUN`（`0xC0000409`）实际是 Windows 在**控制流防护 CFG 与硬件强制堆栈保护等 exploit 防护机制命中时的快速失败（fast-fail）**，由系统主动终止进程，并非传统意义上写穿栈边界导致的栈溢出。论坛说法描述的是表象，处置手段正是针对这套防护机制。
+微软社区讨论中把它描述为「堆栈溢出」，但 `STATUS_STACK_BUFFER_OVERRUN`（`0xC0000409`）实际是 Windows 在**控制流防护 CFG 与硬件强制堆栈保护等 exploit 防护机制命中时的快速失败（fast-fail）**，由系统主动终止进程，并非传统意义上写穿栈边界导致的栈溢出。论坛说法描述的是表象，处置手段正是针对这套防护机制。
 
 参考：[微软社区 — Edge 浏览器崩溃讨论](https://learn.microsoft.com/zh-hans/answers/questions/8007f833-2959-419a-8408-e0cc0bfcbd5d/microsoft?forum=microsoftedge-all&referrer=answers)
 
 ## 单机解决方案
 
-在 Windows 安全中心为该浏览器映像单独放宽硬件强制堆栈保护，使其从"命中即终止"降级为"仅记录"。
+在 Windows 安全中心为该浏览器映像单独放宽硬件强制堆栈保护，使其从「命中即终止」降级为「仅记录」。
 
 ### 1. 在 Exploit Protection 中添加目标程序
 
@@ -45,11 +45,11 @@ copyright: true
 4. 展开 **硬件强制实施的堆栈保护**
 5. 勾选 **替代系统设置**，选择 **仅审核**
 
-"仅审核"表示防护命中时只产生事件而不终止进程，因此浏览器可正常启动，同时在事件日志中保留命中记录，便于后续确认根因。
+「仅审核」表示防护命中时只产生事件而不终止进程，因此浏览器可正常启动，同时在事件日志中保留命中记录，便于后续确认根因。
 
 ![Windows安全中心配置步骤1](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/image-20230607114706037.png "添加Chrome程序到保护列表")
 
-上图确认已添加目标程序，下图确认"硬件强制实施的堆栈保护"已改为替代系统设置并置为仅审核：
+上图确认已添加目标程序，下图确认「硬件强制实施的堆栈保护」已改为替代系统设置并置为仅审核：
 
 ![Windows安全中心配置步骤2](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/image-20230607114725430.png "配置硬件强制堆栈保护")
 
@@ -63,9 +63,9 @@ copyright: true
 
 ### 1. 创建并链接组策略对象
 
-1. 打开"组策略管理"控制台（`gpmc.msc`）
+1. 打开「组策略管理」控制台（`gpmc.msc`）
 2. 右键需要应用策略的组织单位（OU）
-3. 选择"在这个域中创建 GPO 并在此处链接"
+3. 选择「在这个域中创建 GPO 并在此处链接」
 4. 按用途命名，例如 `Chrome_Edge_内核113_崩溃缓解`
 
 ![创建组策略对象](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/image-20230607115112741.png "创建并链接组策略对象")
@@ -131,6 +131,6 @@ gpupdate /force
 
 ## 总结
 
-`STATUS_STACK_BUFFER_OVERRUN` 是 exploit 防护命中后的快速失败，不是真正的栈溢出。单机在 Exploit Protection 中把目标映像的"硬件强制实施的堆栈保护"改为仅审核即可恢复；企业环境把等效的 IFEO 缓解策略通过 GPO 按映像下发，`chrome.exe` 与 `msedge.exe` 需分别配置。
+`STATUS_STACK_BUFFER_OVERRUN` 是 exploit 防护命中后的快速失败，不是真正的栈溢出。单机在 Exploit Protection 中把目标映像的「硬件强制实施的堆栈保护」改为仅审核即可恢复；企业环境把等效的 IFEO 缓解策略通过 GPO 按映像下发，`chrome.exe` 与 `msedge.exe` 需分别配置。
 
 这是绕开防护触发的临时手段，应跟踪 Chromium 与微软的后续版本，在上游修复后撤销配置并恢复默认防护。

@@ -1,14 +1,14 @@
 ---
 title: Ubuntu 安装英伟达驱动与 CUDA
 date: 2023-11-09 11:40:00
-updated: 2026-11-19 11:40:00
+updated: 2026-11-19 15:30:00
 tags:
   - Ubuntu
   - Linux
 categories:
   - 系统运维
 keywords: Ubuntu, 英伟达驱动, CUDA, GPU, Linux 驱动安装
-description: 详细介绍在 Ubuntu 系统中安装英伟达显卡驱动和 CUDA 工具包的完整步骤，包括驱动安装、CUDA 配置和环境变量设置等关键环节。
+description: 在 Ubuntu 上安装 NVIDIA 专有驱动与 CUDA 工具包：runfile 安装器的 DKMS、X 配置、32 位兼容库三项取舍，CUDA 版本不得高于 nvidia-smi 报告值的约束，以及 nouveau 冲突与 Secure Boot 导致加载失败的排查。
 cover: /medias/featureimages/2.jpg
 toc: true
 copyright: true
@@ -17,8 +17,6 @@ copyright: true
 在 Ubuntu 上启用 NVIDIA GPU 的并行计算能力，需依次安装专有驱动与 CUDA 工具包：驱动决定可用的最高 CUDA 版本，CUDA 提供编译器与运行库。本文适用于带独立 NVIDIA GPU 的 Ubuntu 主机，覆盖驱动安装、CUDA 安装、环境变量配置与常见失败排查；操作会修改内核模块与系统级配置，建议先在测试机验证。
 
 ## 准备阶段
-
-在开始安装之前，需要做好以下准备工作：
 
 ### 1. 确认硬件兼容性
 
@@ -41,8 +39,6 @@ sudo apt install gcc g++ make
 ![NVIDIA 驱动下载页面示例](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202311091122261.png "NVIDIA驱动下载页面示例")
 
 ## 安装英伟达驱动
-
-按照以下步骤安装英伟达显卡驱动：
 
 ### 1. 上传驱动文件
 
@@ -71,10 +67,13 @@ sudo init 3                  # 切换至多用户文本模式
 sudo ./NVIDIA-Linux-*.run
 ```
 
-安装过程中按照提示进行操作，通常需要：
-- 接受许可协议
-- 选择安装组件
-- 确认安装路径
+安装器的交互界面里，真正需要做的取舍只有三处：
+
+- **是否勾选 "Install NVIDIA's 32-bit compatibility libraries"**。不装 32 位兼容库的话，Steam/Wine 等 32 位程序调用 GPU 会失败；纯计算服务器可以不装。
+- **是否自动更新 X 配置**。Docker、调度器或容器里使用 GPU 时不要动 `xorg.conf`，选 No，否则容器内 `nvidia-container-runtime` 与宿主的设备映射可能不一致。
+- **是否注册 DKMS**。选 Yes 后内核升级会自动重编译驱动模块；选 No 就要自己在每次内核升级后重跑安装程序，这是生产机驱动突然失联的常见原因。
+
+其余选项（安装路径、32 位库路径等）保持默认即可。
 
 ### 4. 验证安装结果
 

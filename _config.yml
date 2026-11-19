@@ -45,8 +45,12 @@ post_asset_folder: true
 marked:
   prependRoot: true
   postAsset: true
+  # 邮箱实体混淆依赖 Math.random()，每次构建产物都不同（部署产生无意义 diff），
+  # 且本站 about/contact 的可见文本本就是明文邮箱，混淆对爬虫无实际防护，故关闭。
+  mangle: false
 relative_link: false
 future: true
+syntax_highlighter: highlight.js
 highlight:
   enable: true
   line_number: true

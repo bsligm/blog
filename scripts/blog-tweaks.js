@@ -11,7 +11,7 @@
  *
  * 构建确定性（同一份源码连续构建须逐字节一致，否则每次部署都产生与内容无关的 diff）：
  * 5. locals.posts 显式按日期倒序
- * 6. locals.tags / locals.categories 按全序排序
+ * 6. locals.pages 按 source 路径排序，locals.tags / locals.categories 按全序排序
  * 7. post.tags / post.categories 虚拟属性按全序排序
  *
  * 5～7 的必要性：PostTag/PostCategory 关系记录由并行 processor 插入，warehouse 的
@@ -112,6 +112,23 @@ const queryFrom = (query, data) => {
 };
 
 const stableSortedQuery = (query) => queryFrom(query, query.data.slice().sort(byNameThenPath));
+
+/**
+ * locals.pages 按 source 路径排序。
+ *
+ * hexo-generator-sitemap 只按 `b.updated - a.updated` 排序，Array.prototype.sort 稳定，
+ * 因此 updated 相同的条目其相对次序完全由输入顺序决定；而 Page 模型的数据键顺序来自
+ * source 目录的并行 processor 插入顺序，与 tags/categories 属同一类抖动。本站
+ * tags/index.md、categories/index.md、friends/index.md 三个页面的 updated 完全相同，
+ * 导致 sitemap.xml 里 tags 与 categories 两条 <url> 每次构建可能互换，产生与内容无关的
+ * 部署 diff。给 pages 一个全序输入即可消解，不影响页面路由与渲染结果。
+ */
+hexo.locals.set('pages', () => {
+    const query = {};
+    if (!hexo.config.future) query.date = { $lte: Date.now() };
+    const pages = hexo.database.model('Page').find(query);
+    return queryFrom(pages, pages.data.slice().sort((a, b) => (a.source === b.source ? 0 : a.source < b.source ? -1 : 1)));
+});
 
 hexo.locals.set('tags', () => stableSortedQuery(hexo.database.model('Tag').filter((tag) => tag.length)));
 

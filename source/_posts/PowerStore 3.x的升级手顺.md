@@ -1,5 +1,5 @@
 ---
-title: PowerStore 3.x 的升级手顺
+title: PowerStore 3.x 升级实录：先固件后系统的顺序约束与维护窗口
 date: 2023-07-28 09:40:00
 updated: 2026-11-20 12:00:00
 tags:

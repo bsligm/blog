@@ -118,7 +118,7 @@ powercfg -duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
 按需安装两个扩展：
 
 - **Adblock Plus**：广告拦截
-- **百度药丸**：站内搜索体验增强，不承担广告拦截
+- **百度药丸（Baidu Capsule）**：专门过滤百度系广告与追踪，与 Adblock Plus（负责通用页面广告拦截）互补
 
 ![Adblock Plus安装](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202509081514393.png "Adblock Plus")
 
@@ -219,4 +219,4 @@ powercfg -duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
 ## 待人工确认
 
 - 封装流程未显式调用 `sysprep /generalize`：各台部署出来的机器 SID 是否一致、进 AD 域前是否需要手动泛化，按所用 Dism++ 版本的实际行为确认；
-- 「百度药丸」Edge 扩展的官方分发地址：正文仅有截图未给出链接，引用前核实来源。
+- 「百度药丸」（Baidu Capsule，武汉小梵猫科技的社区扩展，非百度官方出品）已从 Edge 商店下架（2025 年），且存在同名仿品；如需引用，标注版本与社区扩展属性。

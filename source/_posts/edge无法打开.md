@@ -62,10 +62,11 @@ HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge
 - 名称：`RendererCodeIntegrityEnabled`
 - 数值数据：`0`
 
-该值关闭 Edge 的渲染器代码完整性检查。明确两点代价：
+该值关闭 Edge 的渲染器代码完整性检查。明确三点代价：
 
 - 这是绕过校验，不是消除注入源。若诱因是第三方安全软件，仍应同步排查其注入规则
 - Edge 后续版本升级可能重置该策略或让问题重新出现，升级后需复验
+- 该策略自 Edge 119 起被标记为 OBSOLETE（官方注明 119 起移除、设置即被忽略，生效区间 78–118）。本修复针对的就是这个版本带；在更新的 Edge 上长期使用，需先确认该策略是否仍生效
 
 ![注册表编辑器配置](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202509081511347.png "注册表项设置")
 

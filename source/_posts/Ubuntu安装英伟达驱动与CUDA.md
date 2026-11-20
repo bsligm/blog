@@ -130,7 +130,7 @@ nvcc -V
 
 **为什么用 runfile 而不是 apt 包。** apt 路线（`nvidia-driver-*`）版本滞后且不可选版本；runfile 现场编译内核模块，能精确指定版本。代价是内核升级要重编译——这就是安装器里 DKMS 必须选 Yes 的原因，否则就得锁内核。
 
-**专有驱动 vs 开源内核模块。** 2023 年对当时的卡，专有驱动是稳妥选择。这个选项在新一代架构上变成关键项：vGPU、MIG 依赖开源内核模块（`-m=kernel-open`），Blackwell 系卡在 PVE 上的实测也都建立在开源模块上——后面 GPU 切分篇的黑名单 `nouveau` 报 `unknown chipset` 就是这个背景。
+**专有驱动 vs 开源内核模块。** 2023 年对当时的卡，专有驱动是稳妥选择。这个选项在新一代架构上变成关键项：部分新特性要求开源内核模块（`-m=kernel-open`），Blackwell 系卡在 PVE 上的实测也全部建立在开源模块上——后面 GPU 切分篇的黑名单 `nouveau` 报 `unknown chipset` 就是这个背景。
 
 **nouveau 为什么必须禁。** nouveau 与专有驱动争抢同一块 GPU，modeset 冲突会让安装器直接失败。屏蔽只处理模块加载，和"卸载 NVIDIA 驱动"是两件事。
 

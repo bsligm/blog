@@ -1,7 +1,7 @@
 ---
 title: Windows Server 的 Agent 接管：PowerShell 7 与 WinRM 双通道实录
 date: 2026-10-01 21:00:00
-updated: 2026-11-20 19:00:00
+updated: 2026-11-20 19:45:00
 tags:
   - Windows Server
   - PowerShell
@@ -94,6 +94,14 @@ SSH 没拆，保留三样，降级路径写明：
 | Hyper-V 宿主 | 5985 主用 | 备选 | `Get-VM` 走 WinRM |
 
 三台共用同一套凭据文件和同一个 pywinrm venv，差异只在连接串。这条写进 Agent 全局基线当硬规则：**Windows 主机任务默认 WinRM 优先，选别的通道要在任务开头写明理由**。比"每台一份连接说明"少维护很多，也不会文档与现场漂移。
+
+## 成果：三台共用一套凭据与一个 venv，补丁窗口期靠 SSH 降级顶住了
+
+现在三台 Windows Server 2025（DC1、DC2、Hyper-V 宿主）跑在同一个固定节奏上：写脚本 → 上传 → 执行 → 读回退出码。差异只在连接串——同一套 600 权限凭据文件、同一个 Python 3.11 的 pywinrm venv、同一张接入矩阵，WinRM 主通道在前，SSH 备选通道挂在每台后面。
+
+- **降级路径不是纸面设计，实际触发过一次并顶住了。** 一台域控打补丁后 `WinRM` 服务被置成 `Automatic (Delayed Start)`，开机后几分钟窗口内主通道不可用，SSH 接住了那次巡检——这段盲区在单通道时代就是丢的。
+- **通道判定规则已进 Agent 全局基线，不再靠记忆。** 硬规则是 Windows 主机任务默认 WinRM 优先、选别的通道要在任务开头写明理由。新增一台 Windows 主机只多一条连接串，不用多维护一份"这台怎么连"的说明，文档和现场不会漂移。
+- **排障收敛在一头。** 执行面全部在 Agent 侧的 pywinrm venv 上，远端只出 stdout/stderr 和退出码，不再两头翻日志；这条 venv 的版本坑（`pyspnego` 无 Python 3.15 wheel）已固定为 3.11 并写进基线，不会复发成"再踩一遍"的成本。
 
 ## 未闭环清单
 

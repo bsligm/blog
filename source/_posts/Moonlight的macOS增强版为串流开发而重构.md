@@ -1,7 +1,7 @@
 ---
 title: 为串流开发重构 Moonlight：macOS 增强版的八周记录
 date: 2026-10-19 21:00:00
-updated: 2026-11-20 19:30:00
+updated: 2026-11-20 20:30:00
 tags:
   - Moonlight
   - 串流
@@ -31,6 +31,32 @@ copyright: true
 
 清单的价值在于**防止"顺手多加功能"**：八周里出现过两次想加"手势映射"的冲动，都因为不在清单上而压住。拆开理由是：范围漂移比范围小更贵，小可以补，漂移要全量回归。
 
+USB 重定向那条验收（断连回收、重连不串设备）的实现，是整条链路不信任旧状态：
+
+```swift
+private func scanBus() {
+  guard MLUSBScanShouldStart(busScanInFlight, !pageIsVisible, true, false,
+                            0, busScanGeneration, 0, 0) else { return }
+  busScanInFlight = true
+  let generation = busScanGeneration
+  DispatchQueue.global(qos: .utility).async {
+    var status = MLUSBBusSnapshotStatus.busUnreadable
+    let devices = MLUSBBusSnapshotCopyDeviceIdentities(&status)
+    DispatchQueue.main.async {
+      busScanInFlight = false
+      guard MLUSBScanMayPublish(!pageIsVisible, generation, busScanGeneration, true) else {
+        if pageIsVisible { scanBus() }   // 切走又切回：旧结果丢弃，立即补扫
+        return
+      }
+      rows = panel.acceptBusSnapshot(devices, status: status, hostIsPaired: hostIsPaired)
+      panelRevision += 1
+    }
+  }
+}
+```
+
+每次刷新给"这一轮"盖一个 generation 编号，后台线程读总线快照回主线程时再核编号：用户扫描期间切走又切回，旧结果直接丢弃并立即补扫，防"拔了设备列表还在"。断连回收不靠事件回调，靠"快照里没出现 = 这一轮的行就不再生成"；规则匹配每次对全新快照重算，重连时同一设备自然回到同一规则，不串。
+
 ## 工程拆分：结论是壳层做全，核心层少动
 
 Moonlight 客户端是跨平台 C++ 核心 + 各平台壳。增强原则一句话：**壳层做全，核心层少动**。
@@ -41,17 +67,62 @@ Moonlight 客户端是跨平台 C++ 核心 + 各平台壳。增强原则一句�
 | 核心 C++ | 只动两处：USB 设备事件回调粒度、崩溃摘要落盘时机 | 每动一行，跨平台回归的代价都要重付一遍 |
 | 打包 | Xcode 工程 + 外部依赖 xcframework，开发期 ad-hoc 签名，出包前统一收紧 | — |
 
+分区重做里有个体现取舍的细节：分区枚举的 raw value 是不连续的：
+
+```swift
+enum SettingsPaneType: Int, CaseIterable {
+  // NOTE: Raw values are pinned to keep backward compatibility with persisted selection.
+  case stream = 0
+  case video = 1
+  case audio = 5
+  case input = 2
+  case app = 3
+  case legacy = 4
+  case devices = 6  // 下一个空闲值；重排编号等于把老用户的存档选择挪到别的页
+
+  static var allCases: [SettingsPaneType] {
+    [.stream, .video, .audio, .input, .app, .devices]
+  }
+}
+```
+
+0/1/5/2/3/6 不是笔误：选中项会持久化到用户 defaults，重排编号等于把老用户"上次打开的页"挪到别的分区。新增"设备"分区只取下一个空闲值 6，`allCases` 再显式列一次展示顺序——"存储值"和"展示顺序"解耦，一次代价换掉持久值迁移表。
+
 一个值得记的控件决策：设置页六分区标签栏最终用系统原生分段控件 + tabs 语义，而不是自绘的玻璃拟态标签。自绘好看，但可访问性、键盘导航、高亮状态全要自己保——**在设置页这种"高频进入但停留短"的界面上，系统控件的隐性价值大于自绘的视觉价值**。这条写进了项目红线：这个控件不许换。
 
 ## 反直觉的坑：Terminated: 15 不是代码问题
 
-CI 超时表现为 `Terminated: 15`，看起来像代码问题，实际是排队 + 单 runner 的并发瓶颈。反直觉的地方是：**错误信息指向执行，根因却在调度**，对着 diff 找原因会找很久。结构性约束是：macOS 的 Xcode 构建只能在 macOS runner 上跑，家里只有一台，任意时刻最多一个 macOS 构建在跑，其余排队；审计类 job（源码合规扫描）单次跑 140 秒左右，叠加构建后整条流水线经常逼近 10 分钟超时线。
+CI 超时表现为 `Terminated: 15`，看起来像代码问题，实际是排队 + 单 runner 的并发瓶颈。反直觉的地方是：**错误信息指向执行，根因却在调度**，对着 diff 找原因会找很久。结构性约束是：macOS 的 Xcode 构建只能在 macOS runner 上跑，家里只有一台，任意时刻最多一个 macOS 构建在跑，其余排队。审计 job 单跑 140 秒左右，但和变异测试电池、安全 job 共用一台 8 核 runner 时，它实际跑过 1803 秒、被旧 30 分钟线杀掉——这就是 `Terminated: 15` 的真实长相。
 
 处理分三层：
 
 1. **重试先于归因**：`Terminated: 15` 的 job 单跑一次，过了就记"单 runner 并发"，不再对着 diff 找原因。这条省掉了很多伪排查；
-2. **docs-only 变更走 rules 跳过重 job**：只改文档的分支不该跑全量源码审计，按变更路径过滤；
-3. **超时线对审计 job 单独放宽**：构建 10 分钟不动，审计类放到 15 分钟，各管各的。
+2. **rules 层防同 SHA 双流水线**：一次 push 会同时生成 push 流水线和 MR 流水线，pipeline 791/792 就是这条的证据——十五个安全 job 为一次裁决排队，Mac job 全部空等；docs-only 按路径过滤是后续优化，尚未入库；
+3. **超时线按实测写、注释里留证据链**：构建 30 分钟线不动，审计类按实测单独放宽：
+
+```yaml
+audit:python:
+  stage: lint
+  tags: [macos]
+  cache: {}
+  # Measured ~140s alone; pipeline 647 recorded 1803s (killed at the old
+  # 30m ceiling) while the mutation battery and security jobs shared the
+  # 8-core runner.
+  timeout: 60 minutes
+
+workflow:
+  rules: &pipeline_rules
+    # A branch with an open merge request is judged by that merge request,
+    # not by its own push pipeline. Pipeline 791 and 792 are the evidence:
+    # one push made both, fifteen security jobs queued for one verdict.
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+```
+
+不写证据链，超时线就只是拍出来的数：60 分钟是 pipeline 647 买回来的，不是嫌 15 分钟紧。最重的变异测试电池单独 200 分钟线加 `resource_group` 串联，不和它要保护的门禁抢核。
 
 ## 两条验收线：串流能用，不等于开发机可用
 

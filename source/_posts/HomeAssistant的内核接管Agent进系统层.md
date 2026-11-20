@@ -1,7 +1,7 @@
 ---
 title: Home Assistant 的内核接管：让 Agent 摸到 HAOS 的系统层
 date: 2026-10-03 22:00:00
-updated: 2026-11-20 19:45:00
+updated: 2026-11-20 20:30:00
 tags:
   - Home Assistant
   - HAOS
@@ -31,15 +31,70 @@ Home Assistant 在接管清单里是特殊的：官方 API 很完善，但全是
 
 系统层是这次新开的。HAOS 的 SSH 默认不开，开了就是 root——这个权限级别在家庭环境里必须配套收口动作，见下文。
 
+## 系统层通道：dropbear，不是 OpenSSH
+
+HAOS 的 SSH 和家里其他 Linux 主机的 OpenSSH 不是一个东西：独立端口、dropbear 实现、独立口令（统一口令在 HAOS 上直接失败，收口动作见后文）。连接形态因此单独写死在通道定义里：
+
+```bash
+HA=root@<haos>
+SSH="ssh -i $HOME/.ssh/id_ed25519 -o UserKnownHostsFile=$KH -o ConnectTimeout=20 -p 22222 $HA"
+# dropbear 无 sftp-server：scp 必须加 -O 走 sftp 协议兼容层
+scp -O -i "$HOME/.ssh/id_ed25519" -o UserKnownHostsFile="$KH" -P 22222 \
+    "$HA:/mnt/data/supervisor/backup/$SLUG.tar" "$OUT/HA-$NAME.tar"
+tar tf "$OUT/HA-$NAME.tar" >/dev/null && echo "tar OK"   # 回读：tar 结构可读才算完整
+```
+
+两个坑都踩出来才写进通道定义的：dropbear 默认不带 sftp-server，新版 scp 默认走 SFTP 协议，不加 `-O` 会直接握手失败——所以 `-O` 是这个通道的固定参数，不是可选优化；`tar tf` 回读是因为"scp 退出码 0"只证明文件字节到了，tar 结构可读才算完整。备份闭环的完整链路：触发 → 等完成 → `scp -O` 拉回 → restic 推远端仓 → HA 侧轮转（保 2 份 `ops-` 前缀快照）→ 本地 14 天轮转；restic 的 forget/prune 遇陈旧锁先 `restic unlock` 再重试一次，失败不阻断——产物已入仓，锁是本地问题。
+
 ## 系统层面：三类真实任务
 
 这个通道不是白开的。接管跑通后，Agent 通过系统层实际处理过三类任务：
 
-**容器故障。** 某个第三方集成以容器方式跑，崩溃后应用层只看到"集成不可用"，看不出是容器 OOM 还是镜像挂了。系统层 `docker ps -a` + `docker logs --tail` 一步定位；重建容器比从 UI 里"重新配置集成"快得多，也不动配置。
+**容器故障。** 某个第三方集成以容器方式跑，崩溃后应用层只看到"集成不可用"，看不出是容器 OOM 还是镜像挂了。系统层一步定位，关键在退出码分流：
+
+```bash
+# 定位：看退出码。137=OOMKilled（容器被杀），2=应用自身报错
+$SSH "docker ps -a --filter name=<addon> --format '{{.Names}} {{.Status}} exit={{.State}}'"
+$SSH "docker logs --tail 50 --timestamps <addon-container>"
+# 重建：镜像不动、配置不动，只重建容器本体
+$SSH "docker stop <addon-container> && docker rm <addon-container>"
+$SSH "ha addon reload <addon>"        # 走 HA 的 addon 机制重建，而不是手搓 docker run
+```
+
+退出码是分流判据：137 要去调内存限额、看宿主压力，2 是集成自身问题要看日志，两者处置完全不同——定位的产物不是"容器挂了"四个字，而是该走哪条处置路径。重建走 `ha addon reload` 而不是裸 `docker run`，保证配置来源仍是 HA 托管的 compose，重建结果不会被下次升级的容器清单当成"野容器"。这段是示意等价实现，真实脚本多了重建后的状态回读。
 
 **磁盘水位。** HAOS 系统盘不大，数据库加备份慢慢会涨。Agent 定期查 `df`，水位过线时先查占用大头（`/var/lib/mysql`、备份目录、容器日志）。容器日志的轮转策略在系统层改一次就长期生效，不用每次手动清。
 
-**HAOS 升级。** 应用层 UI 只能选"升级 HA"，HAOS 本体的升级必须走系统层。Agent 的做法：升级前读当前版本号、确认磁盘余量、拉一个快照；升级后对比版本号、检查各集成状态、把结果写回巡检报告。整条链路里没有一步需要人打开 UI。
+**HAOS 升级。** 应用层 UI 只能选"升级 HA"，HAOS 本体的升级必须走系统层。升级前必做的一步是快照，用的就是 Supervisor 的 full backup。`ha backups new` 是异步的——CLI 返回 slug 不代表备份完成，完成判定用"两次采样文件大小稳定"，比轮询状态文本更抗实现变化：
+
+```bash
+NAME="ops-$(date +%F-%H%M)"
+SLUG=$($SSH "ha backups new --name $NAME" | awk '/^slug:/{print $2}')
+[[ "$SLUG" =~ ^[0-9a-f]{8}$ ]] || { echo "ERROR invalid backup slug"; exit 1; }
+# 完成判定：文件大小连续两次采样不变且非零，而不是看"进度条"
+for i in $(seq 1 120); do
+    sleep 10
+    SZ=$($SSH "stat -c %s /mnt/data/supervisor/backup/$SLUG.tar 2>/dev/null || echo 0")
+    SZ2=$($SSH "sleep 8; stat -c %s /mnt/data/supervisor/backup/$SLUG.tar 2>/dev/null || echo 0")
+    if [ "$SZ" = "$SZ2" ] && [ "$SZ" != "0" ]; then echo "done size=$SZ"; break; fi
+done
+```
+
+两次采样间隔 8 秒且都从远端取，防的是"本地时钟快、远端还在写"的假稳定。快照名带 `ops-` 前缀是刻意的：后面轮转只删自己创建的前缀，不碰用户手动备份。轮转走 `--raw-json` 回读，Agent 侧精确圈定对象：
+
+```bash
+LIST=$($SSH "ha backups list --raw-json")
+printf '%s' "$LIST" | python3 -c '
+import sys, json
+b = json.load(sys.stdin)["data"]["backups"]
+b = sorted((x for x in b if x["name"].startswith("ops-") and x["type"] == "full"),
+           key=lambda x: x["date"], reverse=True)
+print("\n".join(x["slug"] for x in b[2:]))' | while IFS= read -r old; do
+    $SSH "ha backups remove $old" || echo "WARN backup removal failed: $old"
+done
+```
+
+"前缀 + type=full"两个条件同时满足才进轮转候选，保留最近 2 份。HAOS 侧一切以 `ha` CLI 的结构化输出为准，不看 UI——这也是升级后"对比版本号、检查各集成状态"的具体做法：`ha os info` 读前后版本 diff，`ha addon list --raw-json` 逐集成核状态，结果写回巡检报告。整条链路里没有一步需要人打开 UI。
 
 ## 容器内修改：诊断的路，不是修改的路
 
@@ -57,7 +112,7 @@ SSH root 在家庭网里的风险面主要是"谁能连"。收口动作：
 
 ## 全站位置：一套通道口径覆盖四类系统
 
-HA 这条线打通后，家里的接管面覆盖：
+HA 这条线打通后，接管面覆盖：
 
 | 系统 | 通道 |
 | --- | --- |
@@ -66,15 +121,15 @@ HA 这条线打通后，家里的接管面覆盖：
 | HAOS | SSH 系统层 + API 应用层 |
 | Web 控制台服务 | 各自的 API |
 
-Agent 侧的结论是统一的：**每个系统给出"应用层 + 系统层"两个明确通道，操作分级，不靠一个万能通道走天下**。
+结论统一：**每个系统给出"应用层 + 系统层"两个明确通道，操作分级，不靠一个万能通道走天下**。
 
 ## 成果：三类系统层任务全部闭环，整条链路没打开过 UI
 
 现在 HAOS 上跑着两层通道：应用层 REST + WebSocket API（长期 token，只读为主）加系统层 SSH（管理网段限定，root），权限边界就是前文那张分工表，两边各管各的。
 
-- **三类系统层任务都跑出过真实结果，全程零 UI 操作。** 容器故障用 `docker ps -a` + `docker logs --tail` 一步定位并重建，比从 UI"重新配置集成"快；磁盘水位由 Agent 定期查 `df`，容器日志轮转策略在系统层改一次就长期生效，不再每次手动清；HAOS 升级走"读版本号 → 查磁盘余量 → 拉快照 → 升级后对比版本号、查集成状态、写回巡检报告"，链路里没有一步需要人打开 UI。
+- **三类系统层任务都跑出过真实结果，全程零 UI 操作。** 容器故障按退出码分流定位、走 addon 机制重建；磁盘水位定期查 `df`，日志轮转写进容器配置一次生效；HAOS 升级走"读版本号 → 查余量 → 快照（双采样判完成、ops- 前缀轮转保 2 份）→ 升级后 diff 版本、逐集成核状态、写回报告"，链路里没有一步需要人打开 UI。
 - **"升级会吃掉什么"这类坑已经用规则钉死了。** 容器内 `docker exec` 只许诊断、不许修改，配置变更一律走会被升级保留的路径——这一类"升级后修改被静默丢掉"的故障从路径上被排除，而不是靠人记。
-- **家里四类系统的通道口径统一了。** Windows 走 WinRM、Linux 服务机走 SSH、HAOS 走系统层加应用层、Web 控制台走各自 API，每个系统都是"应用层 + 系统层"两个明确通道——出问题时先定层，排查路径一眼可判，不用再两头查。
+- **家里四类系统的通道口径统一了。** Windows 走 WinRM、Linux 服务机走 SSH、HAOS 走系统层加应用层、Web 控制台走各自 API，每个系统都是"应用层 + 系统层"两个明确通道——出问题时先定层，排查路径一眼可判。
 
 ## 未闭环清单
 

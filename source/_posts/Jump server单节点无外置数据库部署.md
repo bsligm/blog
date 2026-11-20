@@ -11,7 +11,7 @@ categories:
   - 安全管理
 keywords: JumpServer, 堡垒机, 单节点部署, 离线安装, LDAP, 资产授权
 description: JumpServer 单节点 + 内置数据库的离线部署：jmsctl 安装与配置项取舍、LDAP 对接、资产纳管与用户组授权、SECRET_KEY 一致性约束、录像备份恢复演练与高频故障排查。
-cover: /img/cover/4.jpg
+cover: /img/cover/jumpserver-oss.jpg
 toc: true
 copyright: true
 ---

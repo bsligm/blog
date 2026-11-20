@@ -13,7 +13,7 @@ categories:
   - 游戏优化
 keywords: macOS 26, CrossOver Preview, GPTK3, 游戏移植工具包, 一键更新脚本, MetalFX, DLSS
 description: GPTK3（Game Porting Toolkit）替换自动化：时间戳备份、MD5 校验、失败回滚、容器级 DLL 复制，把 CrossOver 内旧版 GPTK 组件换成 3.0 beta 3。
-cover: /img/cover/1.jpg
+cover: /img/cover/crossover-gptk.jpg
 toc: true
 copyright: true
 ---

@@ -9,7 +9,7 @@ categories:
   - 系统运维
 keywords: Ubuntu, 英伟达驱动, CUDA, runfile 安装, DKMS, nouveau, Secure Boot
 description: Ubuntu 用 runfile 装 NVIDIA 专有驱动与 CUDA 工具包：驱动决定 CUDA 上限、安装器三处取舍、nouveau 屏蔽、Secure Boot、环境变量与多版本共存坑，外加开源内核模块与版本兼容矩阵等关键决策。
-cover: /img/cover/2.jpg
+cover: /img/cover/cuda-driver.jpg
 toc: true
 copyright: true
 ---

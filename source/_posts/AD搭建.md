@@ -11,7 +11,7 @@ categories:
   - 服务器管理
 keywords: Windows Server, AD域, 服务器安装, 域控制器, Active Directory, SYSVOL, DSRM, 域控部署
 description: 裸机到域控的完整手顺：U 盘与远程管理两种安装方式、计算机名与静态 IP 取舍、向导不可回退项（域名、NetBIOS 名、功能级别、DSRM），及 dcdiag、repadmin、SRV 记录与客户端登录四项验证判据。
-cover: /img/cover/0.jpg
+cover: /img/cover/ad-domain.jpg
 toc: true
 copyright: true
 ---

@@ -9,7 +9,7 @@ categories:
   - 基础设施
 keywords: PowerStore, 驱动器固件升级, PowerStoreOS, NDU, 维护窗口
 description: PowerStore 3.x 升级手顺：先固件后 PowerStoreOS 的顺序约束、Call Home 维护窗口、NDU 期间 vVol 任务不可用的边界、自动下载只下载不安装的坑，维护窗口按设备数量累加（单台 1–1.5 小时）。
-cover: /img/cover/1.jpg
+cover: /img/cover/powersstore-upgrade.jpg
 toc: true
 copyright: true
 ---

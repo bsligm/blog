@@ -11,7 +11,7 @@ categories:
   - 系统运维
 keywords: Edge浏览器, 渲染器代码完整性, RendererCodeIntegrityEnabled, 注册表, 组策略, 企业部署
 description: Edge 启动后任意网页都提示兼容性问题的处置：真实触发点是渲染器代码完整性检查，单机置注册表 RendererCodeIntegrityEnabled 为 0，企业用独立 GPO 定向下发并回读验证。
-cover: /img/cover/7.jpg
+cover: /img/cover/edge-compat.jpg
 toc: true
 copyright: true
 ---

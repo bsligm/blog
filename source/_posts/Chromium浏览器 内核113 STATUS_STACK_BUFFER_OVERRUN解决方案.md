@@ -13,7 +13,7 @@ categories:
   - 桌面维护
 keywords: Chromium, Chrome, Edge, STATUS_STACK_BUFFER_OVERRUN, Exploit Protection, 硬件强制堆栈保护, 组策略
 description: Chromium 113 崩溃 STATUS_STACK_BUFFER_OVERRUN 定位：硬件强制堆栈保护命中的 fail-fast，非传统栈溢出。单机仅审核，企业按映像 GPO 下发 IFEO 缓解。
-cover: /img/cover/3.jpg
+cover: /img/cover/chromium-crash.jpg
 toc: true
 copyright: true
 ---

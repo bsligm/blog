@@ -12,7 +12,7 @@ categories:
   - 安全管理
 keywords: BitLocker, 批量部署, AD域, 组策略, TPM 2.0, 恢复密钥
 description: 域环境批量部署 BitLocker：bat 包 ps1 脚本（ProtectionStatus+EncryptionStatus 联合判定）、GPO 配置，恢复密钥双通道留存（AD 对象 + 共享文本兜底）。
-cover: /img/cover/6.jpg
+cover: /img/cover/bitlocker.jpg
 toc: true
 copyright: true
 ---

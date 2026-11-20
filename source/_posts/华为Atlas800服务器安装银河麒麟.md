@@ -12,7 +12,7 @@ categories:
   - 服务器管理
 keywords: Atlas800, 银河麒麟, iBMC, NPU 驱动, CANN, aarch64
 description: Atlas 800（aarch64）经 iBMC 装银河麒麟，再装 NPU 驱动、固件与 CANN：三次重启时序、版本三元组硬匹配、npu-smi 出表不等于 CANN 可用。
-cover: /img/cover/2.jpg
+cover: /img/cover/atlas-kylin.jpg
 toc: true
 copyright: true
 ---

@@ -8,7 +8,7 @@ comments: false
 
 如果您有任何问题或建议，欢迎通过以下方式联系我：
 
-- **GitHub**: [bsligm](https://github.com/bsligm)
+- **GitHub**: [opsbsligm](https://github.com/opsbsligm)
 - **Email**: bsligm@163.com
 - **QQ**: 1055537871
 

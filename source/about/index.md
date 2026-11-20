@@ -25,6 +25,6 @@ layout: "about"
 
 ## 联系方式
 
-- GitHub：[bsligm](https://github.com/bsligm)
+- GitHub：[opsbsligm](https://github.com/opsbsligm)
 - Email：bsligm@163.com
 - QQ：1055537871

@@ -32,9 +32,42 @@ cover:
 # 首页开屏模块
 home_top:
   enable: true
-  title: 生活明朗
-  subTitle: 万物可爱
+  title: 算力 · 身份 · 交付物
+  subTitle: 从 vLLM 推理到 AD 域控的落地记录
   siteText: LIGUANGMING
+  icons:
+    - icon: fab fa-nvidia
+      color: "#76b900"
+    - icon: fab fa-python
+      color: "#3776ab"
+    - icon: fab fa-docker
+      color: "#2496ed"
+    - icon: fab fa-linux
+      color: "#333333"
+    - icon: fab fa-github
+      color: "#24292e"
+    - icon: fab fa-golang
+      color: "#00add8"
+    - icon: fab fa-rust
+      color: "#ce422b"
+    - icon: fab fa-js
+      color: "#f0db4f"
+    - icon: fab fa-c
+      color: "#00599f"
+    - icon: fab fa-cpp
+      color: "#00599f"
+    - icon: fab fa-git-alt
+      color: "#f05032"
+    - icon: fab fa-node-js
+      color: "#68a063"
+    - icon: fab fa-java
+      color: "#e76f00"
+    - icon: fas fa-microchip
+      color: "#3b82f6"
+    - icon: fas fa-bolt
+      color: "#f59e0b"
+    - icon: fas fa-database
+      color: "#334155"
   category:
     - name: 基础设施
       path: /categories/

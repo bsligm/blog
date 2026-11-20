@@ -99,9 +99,9 @@ comments:
   count: false
 
 giscus:
-  repo: opsbsligm/blog-giscus
-  repo_id: R_kgDOV1Jl6g
-  category_id: DIC_kwDOV1Jl6s4DLj1X
+  repo: bsligm/blog-giscus
+  repo_id: R_kgDOV1NODA
+  category_id: DIC_kwDOV1NODM4DLkCW
   light_theme: light
   dark_theme: dark
 

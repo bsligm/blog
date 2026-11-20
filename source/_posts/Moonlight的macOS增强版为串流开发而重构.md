@@ -12,7 +12,7 @@ categories:
   - 系统维护
   - 桌面维护
 keywords: Moonlight, Sunshine, macOS, 串流, Xcode, CI, 单 runner, 对标, USB 重定向
-description: 为串流开发 fork Moonlight 的 macOS 客户端做了八周增强：对标清单怎么先于代码、Swift 壳层全做而核心层只动两处的拆分原则、单 macOS runner 下 Terminated: 15 超时的三层处理，以及 hardware_validated=false 这条多机型验收边界。
+description: "为串流开发 fork Moonlight 的 macOS 客户端做了八周增强：对标清单怎么先于代码、Swift 壳层全做而核心层只动两处的拆分原则、单 macOS runner 下 Terminated 15 超时的三层处理，以及 hardware_validated=false 这条多机型验收边界。"
 cover: /img/cover/moonlight-stream.jpg
 toc: true
 copyright: true

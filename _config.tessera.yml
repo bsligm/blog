@@ -36,7 +36,7 @@ home_top:
   subTitle: 在算力、模型与交付物之间，探寻 AI 的落地路径
   siteText: LIGUANGMING
   icons:
-    - icon: fab fa-nvidia
+    - icon: fas fa-terminal
       color: "#76b900"
     - icon: fab fa-python
       color: "#3776ab"
@@ -54,7 +54,7 @@ home_top:
       color: "#f0db4f"
     - icon: fab fa-c
       color: "#00599f"
-    - icon: fab fa-cpp
+    - icon: fas fa-memory
       color: "#00599f"
     - icon: fab fa-git-alt
       color: "#f05032"
@@ -82,7 +82,12 @@ home_top:
       icon: fas fa-wrench
       color: "linear-gradient(120deg, #0fb6a5, #4cd9b0)"
   banner:
-    enable: false
+    enable: true
+    tips: 置顶
+    title: DGX Spark 上的 vLLM 与多 Agent 接入
+    image: /img/cover/dgx-spark-vllm.jpg
+    link: /2026/11/19/DGX-Spark-vLLM%E9%83%A8%E7%BD%B2%E4%B8%8E%E5%A4%9AAgent%E6%8E%A5%E5%85%A5/
+    button: 阅读全文
 
 # 搜索（本地搜索，需 hexo-generator-searchdb，生成 search.xml）
 search:

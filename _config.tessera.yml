@@ -33,7 +33,7 @@ cover:
 home_top:
   enable: true
   title: 算力 · 身份 · 交付物
-  subTitle: 从 vLLM 推理到 AD 域控的落地记录
+  subTitle: 在算力、模型与交付物之间，探寻 AI 的落地路径
   siteText: LIGUANGMING
   icons:
     - icon: fab fa-nvidia

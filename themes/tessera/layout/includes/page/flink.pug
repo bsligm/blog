@@ -1,0 +1,109 @@
+- const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
+- const safeUrl = (value, allowMailto = true) => {
+-   if (!value) return ''
+-   const raw = String(value).trim()
+-   try {
+-     const parsed = new URL(raw, config.url || 'http://localhost/')
+-     const protocols = allowMailto ? ['http:', 'https:', 'mailto:', 'tel:'] : ['http:', 'https:']
+-     return protocols.includes(parsed.protocol) ? raw : ''
+-   } catch (error) {
+-     return ''
+-   }
+- }
+
+#article-container.container
+  .flink
+    - let { content, random, flink_url } = page
+    - let pageContent = content
+
+    if flink_url || random
+      - const linkData = flink_url ? false : site.data.link || false
+      script.
+        (()=>{
+          const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
+          const safeUrl = (value, allowMailto = true) => {
+            if (!value) return ''
+            const raw = String(value).trim()
+            try {
+              const parsed = new URL(raw, location.href)
+              const protocols = allowMailto ? ['http:', 'https:', 'mailto:', 'tel:'] : ['http:', 'https:']
+              return protocols.includes(parsed.protocol) ? raw : ''
+            } catch (error) {
+              return ''
+            }
+          }
+          const errorImg = !{safeJSON(url_for(theme.error_img.flink))}
+          const replaceSymbol = (str) => {
+            return str.replace(/[\p{P}\p{S}]/gu, "-")
+          }
+
+          let result = ""
+          const add = (str) => {
+            for(let i = 0; i < str.length; i++){
+              const classValue = str[i].class_name || ''
+              const replaceClassName = replaceSymbol(String(classValue))
+              const className = classValue ? `<h2 id="${escapeHtml(replaceClassName)}"><a href="#${escapeHtml(replaceClassName)}" class="headerlink" title="${escapeHtml(classValue)}"></a>${escapeHtml(classValue)}</h2>` : ""
+              const classDesc = str[i].class_desc ? `<div class="flink-desc">${escapeHtml(str[i].class_desc)}</div>` : ""
+
+              let listResult = ""
+              const lists = Array.isArray(str[i].link_list) ? str[i].link_list : []
+              if (!{random === true}) {
+                lists.sort(() => Math.random() - 0.5)
+              }
+              for(let j = 0; j < lists.length; j++){
+                listResult += `
+                  <div class="flink-list-item">
+                    <a href="${escapeHtml(safeUrl(lists[j].link))}" title="${escapeHtml(lists[j].name)}" target="_blank" rel="noopener noreferrer">
+                      <div class="flink-item-icon">
+                        <img class="no-lightbox" src="${escapeHtml(safeUrl(lists[j].avatar, false))}" onerror='this.onerror=null;this.src="${escapeHtml(errorImg)}"' alt="${escapeHtml(lists[j].name)}" />
+                      </div>
+                      <div class="flink-item-name">${escapeHtml(lists[j].name)}</div>
+                      <div class="flink-item-desc" title="${escapeHtml(lists[j].descr)}">${escapeHtml(lists[j].descr)}</div>
+                    </a>
+                  </div>`
+              }
+
+              result += `${className}${classDesc} <div class="flink-list">${listResult}</div>`
+            }
+
+            document.querySelector(".flink").insertAdjacentHTML("afterbegin", result)
+            window.lazyLoadInstance && window.lazyLoadInstance.update()
+          }
+
+          const linkData = !{safeJSON(linkData)}
+          if ({Boolean(flink_url)}) {
+            fetch(!{safeJSON(url_for(flink_url))})
+              .then(response => response.json())
+              .then(add)
+          } else if (linkData) {
+            add(linkData)
+          }
+        })()
+
+    else
+      if site.data.link
+        - let result = ""
+        each i in site.data.link
+          - let className = i.class_name ? markdown(`## ${escapeHtml(i.class_name)}`) : ""
+          - let classDesc = i.class_desc ? `<div class="flink-desc">${escapeHtml(i.class_desc)}</div>` : ""
+
+          - let listResult = ""
+
+          each j in i.link_list
+            -
+              listResult += `
+                <div class="flink-list-item">
+                  <a href="${escapeHtml(safeUrl(j.link))}" title="${escapeHtml(j.name)}" target="_blank" rel="noopener noreferrer">
+                    <div class="flink-item-icon">
+                      <img class="no-lightbox" src="${escapeHtml(safeUrl(j.avatar, false))}" onerror='this.onerror=null;this.src="${escapeHtml(url_for(theme.error_img.flink))}"' alt="${escapeHtml(j.name)}" />
+                    </div>
+                    <div class="flink-item-name">${escapeHtml(j.name)}</div>
+                    <div class="flink-item-desc" title="${escapeHtml(j.descr)}">${escapeHtml(j.descr)}</div>
+                  </a>
+                </div>`
+            -
+
+          - result += `${className}${classDesc} <div class="flink-list">${listResult}</div>`
+
+        - pageContent = result + pageContent
+    != pageContent

@@ -13,7 +13,7 @@ categories:
   - 基础设施
 keywords: DGX Spark, GB10, vLLM 部署, NVFP4, 统一内存, LiteLLM 网关, 投机解码 MTP, reasoning_effort, Codex, Claude Code
 description: 256K 上下文本机推理落地 DGX Spark 的完整记录：逐条有出处的 vLLM 参数、经 LiteLLM 接入四类 Agent 客户端的兼容坑、并发与超时的真实归因、多模态识别策略。
-cover: /medias/featureimages/10.jpg
+cover: /img/cover/10.jpg
 toc: true
 copyright: true
 ---

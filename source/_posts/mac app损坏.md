@@ -11,7 +11,7 @@ categories:
   - 系统运维
 keywords: macOS, App损坏, Gatekeeper, spctl, xattr, 隔离属性, 隐私与安全性
 description: macOS 提示「App 已损坏，无法打开，你应该将它移到废纸篓」的处置：多数是 Gatekeeper 拦截而非真损坏，先移除单应用隔离属性或右键放行，必要时临时 spctl 关闭全局评估，放行前先用 spctl -a 确认拦截原因。
-cover: /medias/featureimages/8.jpg
+cover: /img/cover/8.jpg
 toc: true
 copyright: true
 ---

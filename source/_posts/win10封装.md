@@ -11,7 +11,7 @@ categories:
   - 基础设施
 keywords: Win10封装, 系统部署, 批量部署, 镜像制作, NTlite, Dism++, 系统优化
 description: Windows 10 基线镜像封装全流程：虚拟机工位、Administrator 账户与策略预配置、Dism++ 增量备份、NTlite 替换 install.esd 重打包 ISO。附实际改动清单与镜像版本记账方法。
-cover: /medias/featureimages/3.jpg
+cover: /img/cover/3.jpg
 toc: true
 copyright: true
 ---

@@ -13,7 +13,7 @@ categories:
   - 基础设施
 keywords: PVE 初始化部署, LACP bond, VLAN-aware bridge, ZFS refreservation, cloud-init 模板, vGPU profile, MIG 切分, SR-IOV, NUMA 绑定, CPU 亲和, CUDA Graph, VLA 推理延迟
 description: 两台 PVE 宿主机（浪潮 M7 单卡 L40S、超聚变 Pro6000 八卡 RTX PRO 6000）的初始化部署与 GPU 切分记录：L40S 走 mdev 普通 vGPU，PRO 6000 走 SR-IOV 加 MIG 硬分区，为具身智能 S2 模型的边缘推理压延迟。三轮调优每一轮降延迟的思路与实测：NUMA 本地性、固定物理核（没有收益）、MIG 替换时间片，外加模型侧 CUDA Graph 的对照。
-cover: /medias/featureimages/13.jpg
+cover: /img/cover/13.jpg
 toc: true
 copyright: true
 ---

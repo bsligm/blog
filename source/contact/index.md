@@ -1,8 +1,7 @@
 ---
 title: 联系我
 date: 2021-05-06 11:00:00
-type: "contact"
-layout: "contact"
+comments: false
 ---
 
 # 联系我

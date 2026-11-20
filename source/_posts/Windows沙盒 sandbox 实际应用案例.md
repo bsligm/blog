@@ -11,7 +11,7 @@ categories:
   - 安全管理
 keywords: Windows沙盒, Sandbox, 安全隔离, 虚拟化, Flash Player, IE浏览器
 description: 用 Windows 沙盒解决 IT 支持两难题：MappedFolders 映射安装脚本目录、LogonCommand 自动静默装 Flash Player，在隔离环境运行依赖 IE 的打印机联机认证后台，关窗即销毁。
-cover: /medias/featureimages/5.jpg
+cover: /img/cover/5.jpg
 toc: true
 copyright: true
 ---

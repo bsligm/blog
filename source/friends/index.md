@@ -1,8 +1,7 @@
 ---
 title: "友人帐"
 date: 2021-05-06 11:00:00
-type: "friends"
-layout: "friends"
+type: "link"
 sitemap: false
 ---
 

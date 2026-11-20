@@ -1,0 +1,104 @@
+# 李广明博客 — Tessera 站点配置
+# 只写需要覆盖项，其余走主题默认值。文档: https://tessera.talyra42.top
+
+# 导航栏
+nav:
+  logo: /img/logo.png
+  display_title: true
+  display_post_title: true
+  fixed: true
+
+menu:
+  首页: / || fas fa-home
+  归档: /archives/ || fas fa-archive
+  分类: /categories/ || fas fa-folder-open
+  标签: /tags/ || fas fa-tags
+  友链: /friends/ || fas fa-link
+  关于: /about/ || fas fa-user
+
+# 站点图标与头像
+favicon: /img/logo.png
+avatar:
+  img: /img/avatar.jpg
+  effect: false
+
+# 封面
+cover:
+  index_enable: true
+  aside_enable: true
+  archives_enable: true
+  random_cover_dir: img/cover
+
+# 首页开屏模块
+home_top:
+  enable: true
+  title: 生活明朗
+  subTitle: 万物可爱
+  siteText: LIGUANGMING
+  category:
+    - name: 基础设施
+      path: /categories/
+      icon: fas fa-server
+      color: "linear-gradient(120deg, #425AEF, #7a8eff)"
+    - name: 系统集成
+      path: /categories/
+      icon: fas fa-network-wired
+      color: "linear-gradient(120deg, #f65c2c, #ff9a52)"
+    - name: 系统运维
+      path: /categories/
+      icon: fas fa-wrench
+      color: "linear-gradient(120deg, #0fb6a5, #4cd9b0)"
+  banner:
+    enable: false
+
+# 搜索（本地搜索，需 hexo-generator-searchdb，生成 search.xml）
+search:
+  use: local_search
+  placeholder: 搜索文章…
+  local_search:
+    preload: true
+    top_n_per_article: 3
+# 评论：Giscus（GitHub 登录留言，评论存为仓库 issue）
+comments:
+  use: Giscus
+  text: true
+  lazyload: false
+  count: false
+
+giscus:
+  repo: opsbsligm/blog-giscus
+  repo_id: R_kgDOV1Jl6g
+  category_id: DIC_kwDOV1Jl6s4DLj1X
+  light_theme: light
+  dark_theme: dark
+
+# 社交
+social:
+  fab fa-github: https://github.com/bsligm || GitHub
+
+# 代码块
+code_blocks:
+  theme: darker
+  macStyle: false
+  word_wrap: false
+  copy: true
+  language: true
+  shrink: false
+
+# 字数统计与阅读时长（hexo-wordcount）
+wordcount:
+  enable: true
+  post_wordcount: true
+  min2read: true
+
+# 文章内目录
+toc:
+  post: true
+  number: true
+
+# 页脚版权
+footer:
+  owner:
+    enable: true
+    since: 2021
+

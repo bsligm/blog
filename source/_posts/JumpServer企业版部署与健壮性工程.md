@@ -11,7 +11,7 @@ categories:
   - 安全管理
 keywords: JumpServer 企业版, PAM, 高鲁棒性, systemd timer, PostgreSQL 备份, 健康巡检, AD 组同步, LDAP 部门映射, AccessKey HMAC, AI Agent, JMS Admin API, AI Native, 故障恢复演练
 description: JumpServer 企业版从部署到 AI Native 改造：原子备份、两分钟巡检、AD 部门自动映射、一次 500 故障完整恢复，以及让 Codex 走 HMAC 签名 Admin API 纳管资产并录像审计。
-cover: /medias/featureimages/11.jpg
+cover: /img/cover/11.jpg
 toc: true
 copyright: true
 ---

@@ -87,7 +87,7 @@
           var dateEl = document.getElementById('hc-date')
           var featLink = document.getElementById('hc-featured')
           var featTitle = document.getElementById('hc-feat-title')
-          var featured = #{JSON.stringify(featPosts.map(function (p) { return { t: p.title, l: p.path } }))}
+          var featured = !{JSON.stringify(featPosts.map(function (p) { return { t: p.title, l: p.path } }))}
           var pad = function (n) { return n < 10 ? '0' + n : '' + n }
           var week = '日一二三四五六'
           function tick() {

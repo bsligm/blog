@@ -8,13 +8,15 @@ tags:
 categories:
   - 系统运维
 keywords: Ubuntu, 英伟达驱动, CUDA, runfile 安装, DKMS, nouveau, Secure Boot
-description: Ubuntu 上用 runfile 安装 NVIDIA 专有驱动与 CUDA 工具包：停图形界面再装、安装器三处取舍（32 位库/X 配置/DKMS）、CUDA 版本不得高于 nvidia-smi 上限，nouveau 屏蔽与 Secure Boot 的排查，环境变量与多版本共存的坑。
+description: Ubuntu 用 runfile 装 NVIDIA 专有驱动与 CUDA 工具包：驱动决定 CUDA 上限、安装器三处取舍、nouveau 屏蔽、Secure Boot、环境变量与多版本共存坑，外加开源内核模块与版本兼容矩阵等关键决策。
 cover: /medias/featureimages/2.jpg
 toc: true
 copyright: true
 ---
 
-NVIDIA GPU 在 Ubuntu 上要跑起来分两步：先装专有驱动（决定可用的最高 CUDA 版本），再装 CUDA 工具包（编译器与运行库）。这篇覆盖 runfile 安装全过程与常见失败排查；操作会改内核模块和系统级配置，建议先在测试机验证。
+计算与存储主题的三篇老文是算力层的起点，这篇是最底层的一篇：先装专有驱动（决定可用的最高 CUDA 版本），再装 CUDA 工具包（编译器与运行库）。后来的 DGX Spark 部署、PVE GPU 切分、vLLM 环境，全部落回这两步。当时没展开的点——驱动版本怎么选、驱动与 CUDA 的兼容矩阵、ECC、nvidia-persistenced——正是后面踩坑最多的地方。
+
+这篇覆盖 runfile 安装全过程与常见失败排查；操作会改内核模块和系统级配置，建议先在测试机验证。
 
 ## 准备
 
@@ -123,6 +125,16 @@ nvcc -V
 出版本信息即成功：
 
 ![nvcc 命令输出示例](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202311091305908.png "nvcc命令输出示例")
+
+## 关键设计决策
+
+**为什么用 runfile 而不是 apt 包。** apt 路线（`nvidia-driver-*`）版本滞后且不可选版本；runfile 现场编译内核模块，能精确指定版本。代价是内核升级要重编译——这就是安装器里 DKMS 必须选 Yes 的原因，否则就得锁内核。
+
+**专有驱动 vs 开源内核模块。** 2023 年对当时的卡，专有驱动是稳妥选择。这个选项在新一代架构上变成关键项：vGPU、MIG 依赖开源内核模块（`-m=kernel-open`），Blackwell 系卡在 PVE 上的实测也都建立在开源模块上——后面 GPU 切分篇的黑名单 `nouveau` 报 `unknown chipset` 就是这个背景。
+
+**nouveau 为什么必须禁。** nouveau 与专有驱动争抢同一块 GPU，modeset 冲突会让安装器直接失败。屏蔽只处理模块加载，和"卸载 NVIDIA 驱动"是两件事。
+
+**版本兼容矩阵怎么查。** 硬约束只有一条：工具包版本 ≤ `nvidia-smi` 显示的 `CUDA Version`——那是驱动支持的上限，不是已装的工具包版本。反查方向从 CUDA 版本找对应驱动，用 CUDA Toolkit Release Notes / 驱动 release notes，别凭记忆。
 
 ## 常见问题
 

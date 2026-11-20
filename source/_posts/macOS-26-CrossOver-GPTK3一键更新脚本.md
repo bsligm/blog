@@ -12,17 +12,26 @@ categories:
   - 系统运维
   - 游戏优化
 keywords: macOS 26, CrossOver Preview, GPTK3, 游戏移植工具包, 一键更新脚本, MetalFX, DLSS
-description: crossover-gptk3.sh 把 GPTK3 文件替换流程自动化：环境校验、带时间戳备份、MD5 校验、失败回滚、按所选容器复制 DLL。绑定 macOS 26 测试版与 GPTK 3.0 beta 3。
+description: GPTK3（Game Porting Toolkit）替换自动化：时间戳备份、MD5 校验、失败回滚、容器级 DLL 复制，把 CrossOver 内旧版 GPTK 组件换成 3.0 beta 3。
 cover: /medias/featureimages/1.jpg
 toc: true
 copyright: true
 ---
 
-CrossOver Preview 在 macOS 26 测试版上尚未完全适配新的游戏移植能力，需手工用 Apple Game Porting Toolkit 3（GPTK3）的文件替换 CrossOver 内置的同名组件，并额外配置 MetalFX 相关文件。`crossover-gptk3.sh` 把这一过程自动化：校验环境、带时间戳备份、替换库文件、MD5 校验，出错时按备份回滚，最后按需把 DLL 复制进指定容器。
+macOS 上跑 Windows 应用有两条路线：虚拟机（重、独占 GPU）与 Wine 兼容层（轻、共享 GPU）。CrossOver 是后者的商业发行版，而 Apple 给开发者的 Game Porting Toolkit（GPTK）把 Metal 上跑 Windows 游戏所需的 DirectX 翻译、FXAA/DLSS 替代品（MetalFX）封装成一套 redist 库——CrossOver 应用包里内置了一份旧版 GPTK 组件（`apple_gptk` 目录）。
 
-保护机制都能事后核验：`external` 与 `wine` 先 `mv` 成 `*.backup.<时间戳>` 再复制新文件，任一改名失败即退出，此时按同一时间戳手工移回即可（两者按先后顺序改名，失败时可能只有一个已改名）。复制失败、或复制后这两个目录缺失，脚本立即用备份还原；MD5 校验失败不自动还原，只汇总失败数并询问是否继续。全部操作追加写入 `/tmp/crossover-gptk3-<时间戳>.log`，出问题以日志和备份目录为准。
+CrossOver Preview 在 macOS 26 测试版上还没跟上 GPTK3，解法是手工把 GPTK 3.0 beta 3 的文件替换进 CrossOver 应用包，再给目标容器补上 `nvngx`（DLSS）→`nvngx-on-metalfx` 的映射。`crossover-gptk3.sh` 把这条路径自动化：校验环境、带时间戳备份、替换库文件、MD5 校验、失败回滚，随后按需把 DLL 复制进指定容器。这篇的价值在预研性质：它验证了「macOS + Wine 系 + 官方移植工具」这条路在公司 VDI/PXVDI 终端方案里的可行性，脚本本身是一次性交付物，升级后重跑即可。
+
+保护机制都能事后核验：`external` 与 `wine` 先 `mv` 成 `*.backup.<时间戳>` 再复制新文件，任一改名失败即退出（两者按先后顺序改名，失败时可能只有一个已改名）。复制失败、或复制后这两个目录缺失，脚本立即用备份还原；MD5 校验失败不自动还原，只汇总失败数并询问是否继续。全部操作追加写入 `/tmp/crossover-gptk3-<时间戳>.log`，出问题以日志和备份目录为准。
 
 适用范围：macOS 26 测试版 + CrossOver Preview + GPTK 3.0 beta 3。脚本修改 CrossOver 应用包内文件，属非官方改动，CrossOver 升级后需重新执行。
+
+## 关键设计决策
+
+- **为什么是脚本而不是 GUI。** 这套操作要动的是应用包内 `/Applications/CrossOver.app/Contents/SharedSupport` 下的受保护目录，GUI 工具（甚至 Finder）在权限、隐藏文件、批量 MD5 三件事上都不顺手。脚本换来回的是可重复：备份、复制、校验、回滚每一步都能从日志重放，出错时不用靠记忆判断「刚才改到哪了」。代价是脚本绑定目录结构与文件清单，CrossOver 或 GPTK 升级后要先重核再跑。
+- **版本锁定：为什么死绑 GPTK 3.0 beta 3。** 脚本按卷名前缀（`Evaluation environment for Windows games`）匹配挂载点，按 `redist/lib` 的文件清单做 MD5 校验。Apple 的 GPTK 是 beta 节奏，版本间文件清单会增减。锁定版本的代价是时效——Apple 发新版后脚本会因找不到镜像或校验不过而中止，这是故意的：宁可失败也不要静默复制一份清单对不上的文件进应用包。
+- **备份策略：先 `mv` 再复制，不原地覆盖。** 应用包目录是「一个文件都丢不起」的状态：CrossOver 升级能还原，手工改坏不能。改名备份（而非复制备份）保证任意时刻磁盘上只有两份状态（原状或新状），中间态不存在；代价是备份和应用包同卷，同盘故障两者一起丢，脚本层面接受这个风险。
+- **提权最小化：能不用 sudo 就不用。** 脚本先测目录可写性再询问提权，且提权只作用于应用包内文件操作，容器目录（用户目录）始终不提权。MDM 管的机器上这条决定脚本能不能非交互跑——提权范围越窄，审批越容易过。
 
 ## 脚本使用指南
 
@@ -657,3 +666,9 @@ echo "${GREEN}•${NC} 查看日志命令：${YELLOW}cat ${LOG_FILE}${NC}"
 使用前确认三项前置条件均已满足（CrossOver Preview 已安装、GPTK 安装包与评估环境镜像均已挂载），并留意容器选择环节：DLL 只复制到所选容器，选错容器不影响文件替换本身，但目标游戏不会获得更新。
 
 **免责**：脚本涉及系统文件操作，使用前了解其功能并做好数据备份，作者不对使用造成的任何损失负责。
+
+## 待人工确认
+
+- CrossOver 后续版本若原生支持 GPTK3（或官方更新 `apple_gptk` 目录结构），本脚本整套作废，届时确认替代路径；
+- `ditto` 复制后逐文件 MD5 校验的是内容一致性，不含权限/签名位：应用包内文件被改后 Code Signing 是否仍被 Gatekeeper/MDM 接受（尤其 `com.apple.security.cs.` 相关 entitlement 校验），在 MDM 环境下需实测一次冷启动确认；
+- 脚本对 macOS 主版本的分支只区分 15 / 26 / 其他，macOS 15.5 之后的小版本对 GPTK3 的支持边界未逐一验证。

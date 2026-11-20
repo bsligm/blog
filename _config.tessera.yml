@@ -29,6 +29,9 @@ cover:
   archives_enable: true
   random_cover_dir: img/cover
 
+# 首页卡片布局：6 = CSS Grid 等高网格（图上文下，描述统一 2 行，同行卡片自动等高）
+index_layout: 6
+
 # 首页开屏模块
 home_top:
   enable: true
@@ -150,4 +153,8 @@ aside:
   card_webinfo:
     enable: false
   card_tags:
-    limit: 18
+    limit: 12
+  card_categories:
+    enable: false
+  card_archives:
+    enable: false

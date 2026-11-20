@@ -140,3 +140,12 @@ footer:
     enable: true
     since: 2021
 
+
+# 侧栏卡片：做减法（公告/近期文章/统计卡关闭，与首页内容重复）
+aside:
+  card_announcement:
+    enable: false
+  card_recent_post:
+    enable: false
+  card_webinfo:
+    enable: false

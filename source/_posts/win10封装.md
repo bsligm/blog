@@ -1,7 +1,7 @@
 ---
 title: Windows 10 系统封装详细教程
 date: 2023-09-08 15:00:00
-updated: 2026-11-19 15:30:00
+updated: 2026-11-20 12:00:00
 tags:
   - Windows
   - 封装
@@ -10,13 +10,13 @@ categories:
   - 系统运维
   - 基础设施
 keywords: Win10封装, 系统部署, 批量部署, 镜像制作, NTlite, Dism++, 系统优化
-description: Windows 10 系统封装的完整流程，覆盖虚拟机安装、账户与策略预配置、Dism++ 清理备份、NTlite 替换 install.esd 打包 ISO，适用于企业批量部署与全新安装场景。
+description: Windows 10 系统封装流程：虚拟机安装、账户与策略预配置、Dism++ 清理备份、NTlite 替换 install.esd 打包 ISO，面向企业批量部署的全新安装场景。
 cover: /medias/featureimages/3.jpg
 toc: true
 copyright: true
 ---
 
-企业 IT 运维中常要重复面对同一件事：给不同部门批量装机，而每个部门的定制软件、环境变量、本地策略都不完全一样。逐台手工配置的时间成本随终端数量线性增长，且难以保证一致性。
+企业批量装机，各部门的定制软件、环境变量、本地策略不完全一样，逐台手工配置的时间成本随终端数量线性增长，且难以保证一致性。
 
 系统封装的思路是把标准软件、环境配置、系统变量与本地策略预先配置好，连同系统状态一并打包成可分发的 ISO，装机时只做一次镜像写入。下文按虚拟机准备、系统与账户配置、策略与优化、清理备份、ISO 打包的顺序记录完整过程。
 
@@ -43,7 +43,7 @@ copyright: true
 
 ### 2. 安装 Windows 10 系统
 
-挂载 ISO 执行安装，下图分别是安装入口与分区设置界面：
+挂载 ISO 执行安装：
 
 ![系统安装界面1](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202509081513034.png "系统安装界面")
 
@@ -51,7 +51,7 @@ copyright: true
 
 ### 3. OOBE 设置
 
-完成初始设置向导（Out of Box Experience）：
+完成 OOBE（Out of Box Experience，初始设置向导）：
 
 ![OOBE设置](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202509081514271.png "初始设置向导")
 
@@ -95,19 +95,19 @@ powercfg -duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
 
 ![启用卓越性能命令](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202509081514835.png "命令执行")
 
-再到控制面板 → 电源选项激活该计划：
+再到控制面板 → 电源选项激活：
 
 ![电源计划设置](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202509081514681.png "电源计划配置")
 
 ### 2. 个性化设置
 
-按企业基线设定桌面外观，包括主题、桌面图标与任务栏样式（桌面右键 → 个性化）：
+按企业基线设定桌面外观（主题、桌面图标、任务栏样式；桌面右键 → 个性化）：
 
 ![个性化设置](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202509081514582.png "个性化配置")
 
 ### 3. Edge 浏览器插件安装
 
-按实际需要安装浏览器扩展，本例安装两个：
+按需安装两个扩展：
 
 - **Adblock Plus**：广告拦截
 - **百度药丸**：站内搜索体验增强，不承担广告拦截
@@ -124,7 +124,7 @@ powercfg -duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
 
 ### 5. 功能与本地策略设置
 
-推荐开启存储感知以控制磁盘占用。本地策略与系统设置两处需保持一致：
+开启存储感知控制磁盘占用，本地策略与系统设置两处保持一致：
 
 - 开启存储感知，执行频率设为每天
 - 存储感知子项全部开启，临时文件保留阈值设为 1 天
@@ -139,7 +139,7 @@ powercfg -duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
 
 ## 系统封装
 
-清理完成后，用 Dism++ 的系统备份功能导出系统镜像。该功能支持增量备份，多个版本可共用一个镜像文件，节省存放空间：
+用 Dism++ 的系统备份功能导出系统镜像，支持增量备份，多个版本可共用一个镜像文件，节省空间：
 
 ![Dism++系统备份](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202509081514056.png "系统备份功能")
 
@@ -206,4 +206,4 @@ powercfg -duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
 
 流程主线是：虚拟机内装系统 → 用 Administrator 完成软件与策略预配置 → Dism++ 清理并备份 → 用 NTlite 替换 `install.esd` 重打包 ISO。终端越多，省下的重复装机时间越可观。
 
-不过封出来的镜像不是做完就一劳永逸。累积补丁会把镜像越拉越旧，新机型也会缺驱动，所以每个镜像版本都要留下「基于哪个 ISO、打了哪批补丁、在哪些真机上验证过驱动/加域/软件」的记录，否则半年后没人说得清手上这份镜像到底处于什么状态，只能从头再封一次。
+不过镜像不是做完就一劳永逸：累积补丁会把镜像越拉越旧，新机型也会缺驱动。每个镜像版本都要留下「基于哪个 ISO、打了哪批补丁、在哪些真机验证过驱动/加域/软件」的记录，否则半年后没人说得清手上这份镜像处于什么状态，只能从头再封一次。

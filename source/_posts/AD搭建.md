@@ -1,7 +1,7 @@
 ---
 title: Windows Server安装以及AD域服务搭建
 date: 2021-05-06 11:00:00
-updated: 2026-11-19 15:30:00
+updated: 2026-11-20 12:00:00
 tags:
   - Server
   - Helpdesk

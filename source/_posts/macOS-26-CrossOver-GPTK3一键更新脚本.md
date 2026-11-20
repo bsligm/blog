@@ -1,7 +1,7 @@
 ---
 title: macOS 26 测试版 CrossOver Preview GPTK3 一键更新脚本
 date: 2025-09-09 10:00:00
-updated: 2026-11-19 15:30:00
+updated: 2026-11-20 12:00:00
 tags:
   - macOS
   - CrossOver
@@ -12,17 +12,17 @@ categories:
   - 系统运维
   - 游戏优化
 keywords: macOS 26, CrossOver Preview, GPTK3, 游戏移植工具包, 一键更新脚本, MetalFX, DLSS
-description: 介绍一款针对 macOS 26 测试版与 CrossOver Preview 环境的一键更新脚本，用于替换 Game Porting Toolkit 3 文件，提升 Windows 游戏在 macOS 上的运行效果。
+description: crossover-gptk3.sh 把 GPTK3 文件替换流程自动化：环境校验、带时间戳备份、MD5 校验、失败回滚、按所选容器复制 DLL。绑定 macOS 26 测试版与 GPTK 3.0 beta 3。
 cover: /medias/featureimages/1.jpg
 toc: true
 copyright: true
 ---
 
-CrossOver Preview 在 macOS 26 测试版上尚未完全适配新的游戏移植能力，需手工用 Apple Game Porting Toolkit 3（GPTK3）的文件替换 CrossOver 内置的同名组件，并额外配置 MetalFX 相关文件。`crossover-gptk3.sh` 将这一过程自动化：校验环境、带时间戳备份、替换库文件、MD5 校验，出错时用备份回滚，最后按需把 DLL 复制进指定容器。
+CrossOver Preview 在 macOS 26 测试版上尚未完全适配新的游戏移植能力，需手工用 Apple Game Porting Toolkit 3（GPTK3）的文件替换 CrossOver 内置的同名组件，并额外配置 MetalFX 相关文件。`crossover-gptk3.sh` 把这一过程自动化：校验环境、带时间戳备份、替换库文件、MD5 校验，出错时按备份回滚，最后按需把 DLL 复制进指定容器。
 
-脚本的保护机制都能事后核验：`external` 与 `wine` 先 `mv` 成 `*.backup.<时间戳>` 再复制新文件，任一改名失败即退出，此时按同一时间戳手工移回即可（两者按先后顺序改名，失败时可能只有一个已改名）。复制新文件失败、或复制后这两个目录缺失，脚本立即用备份还原；MD5 校验失败则不自动还原，只汇总失败数并询问是否继续，要继续还是回滚由你决定。全部操作追加写入 `/tmp/crossover-gptk3-<时间戳>.log`，出问题时以这份日志和备份目录为准，不要凭屏幕提示猜改了哪些文件。
+保护机制都能事后核验：`external` 与 `wine` 先 `mv` 成 `*.backup.<时间戳>` 再复制新文件，任一改名失败即退出，此时按同一时间戳手工移回即可（两者按先后顺序改名，失败时可能只有一个已改名）。复制失败、或复制后这两个目录缺失，脚本立即用备份还原；MD5 校验失败不自动还原，只汇总失败数并询问是否继续。全部操作追加写入 `/tmp/crossover-gptk3-<时间戳>.log`，出问题以日志和备份目录为准。
 
-适用范围：macOS 26 测试版 + CrossOver Preview + Game Porting Toolkit 3.0 beta 3。脚本会修改 CrossOver 应用包内文件，属于非官方改动，CrossOver 升级后需重新执行。
+适用范围：macOS 26 测试版 + CrossOver Preview + GPTK 3.0 beta 3。脚本修改 CrossOver 应用包内文件，属非官方改动，CrossOver 升级后需重新执行。
 
 ## 脚本使用指南
 
@@ -32,7 +32,7 @@ CrossOver Preview 在 macOS 26 测试版上尚未完全适配新的游戏移植�
 3. 挂载下载的安装包镜像
 4. 再次挂载 `Evaluation environment for Windows games 3.0 beta 3.dmg` 镜像
 
-前置条件中的版本号与本脚本验证过的 GPTK 3.0 beta 3 绑定：脚本按卷名前缀匹配挂载点，Apple 后续版本若变更卷名或 `redist/lib` 下的文件清单，需重核后再使用。
+前置条件中的版本号与本脚本验证过的 GPTK 3.0 beta 3 绑定：脚本按卷名前缀匹配挂载点，Apple 后续版本若变更卷名或 `redist/lib` 文件清单，需重核后再用。
 
 ### 脚本执行步骤
 
@@ -50,7 +50,7 @@ chmod +x crossover-gptk3.sh
 
 ### 交互式配置过程
 
-脚本运行时会引导用户完成以下配置：
+脚本运行时的交互：
 
 1. **权限确认**：根据需要确认是否使用 sudo 权限
 2. **容器选择**：
@@ -70,7 +70,7 @@ RED='\033[0;31m'     # 错误
 NC='\033[0m'         # 重置颜色
 ```
 
-脚本按主版本号分支提示：macOS 26 视为本脚本的目标验证环境；macOS 15 提示部分游戏功能可能不可用；高于 26 或未识别的版本提示兼容性未测试；低于 macOS 15 提示 GPTK3 支持可能不完整。
+按主版本号分支提示：26 为目标验证环境；15 提示部分游戏功能可能不可用；高于 26 或未识别的版本提示兼容性未测试；低于 15 提示 GPTK3 支持可能不完整。
 
 ### 文件操作安全机制
 ```bash
@@ -83,7 +83,7 @@ $SUDO mv wine "wine.backup.${BACKUP_TIMESTAMP}"
 ```
 
 ### 完整性验证
-脚本逐个比对源文件与目标文件的摘要，优先用 `md5 -q`，没有则回退 `md5sum`：
+逐个比对源与目标文件的摘要，优先 `md5 -q`，没有则回退 `md5sum`：
 ```bash
 if command -v md5 >/dev/null 2>&1; then
     source_md5=$(md5 -q "$source_file" 2>/dev/null)
@@ -93,10 +93,10 @@ elif command -v md5sum >/dev/null 2>&1; then
     target_md5=$(md5sum "$target_file" 2>/dev/null | cut -d' ' -f1)
 ```
 
-两个工具都不存在时脚本只打印「MD5 工具不可用，跳过校验」并继续，不会因此中止。也就是说跑完没报错不等于校验过——要确认完整性，得在日志里搜这一行有没有出现。
+两个工具都不存在时只打印「MD5 工具不可用，跳过校验」并继续。跑完没报错不等于校验过——确认完整性要在日志里搜这一行有没有出现。
 
 ### MetalFX 配置
-自动处理 MetalFX 相关文件的重命名：
+MetalFX 相关文件自动重命名：
 ```bash
 # MetalFX文件列表
 metalfx_files=(
@@ -108,16 +108,16 @@ metalfx_files=(
 ## 使用建议与注意事项
 
 ### 权限管理
-脚本先测目录可写性再决定要不要提权：`[ ! -w "${CROSSOVER_GPTK_DIR}" ]` 成立才询问是否用 sudo，选 N 直接退出。CrossOver 由当前用户安装到 `/Applications` 时通常不需要提权；如果被 MDM 或安装器改过属主，才会走到这一支。提权只作用于应用包内的文件操作，容器目录（用户目录下）始终不提权。
+先测目录可写性再决定提权：`[ ! -w "${CROSSOVER_GPTK_DIR}" ]` 成立才询问是否用 sudo，选 N 直接退出。CrossOver 由当前用户安装到 `/Applications` 时通常不需要提权，被 MDM 或安装器改过属主才会走到这一支。提权只作用于应用包内文件操作，容器目录（用户目录下）始终不提权。
 
 ### 版本时效
-本脚本按 GPTK 3.0 beta 3 的卷名与文件清单编写。Apple 更新 Game Porting Toolkit 后，挂载卷名、`redist/lib` 目录结构或文件名可能变化；此时脚本会因找不到评估环境或校验不过而中止，需按新版本实际内容重核后再调整。同理，CrossOver 升级会还原应用包内文件，升级后需重新运行本脚本。
+本脚本按 GPTK 3.0 beta 3 的卷名与文件清单编写。Apple 更新后挂载卷名、`redist/lib` 结构或文件名可能变化，脚本会因找不到评估环境或校验不过而中止，需按新版本重核。CrossOver 升级会还原应用包内文件，升级后需重新运行。
 
 ### 日志记录
-日志路径形如 `/tmp/crossover-gptk3-<时间戳>.log`，由 `log_operation` 用 `tee -a` 同时输出到屏幕和文件，因此屏幕上看到的内容都在文件里，反之日志里还多了时间戳。文件在 `/tmp` 下，系统重启或定期清理后会丢失，需要留档就先拷走。
+日志路径形如 `/tmp/crossover-gptk3-<时间戳>.log`，由 `log_operation` 用 `tee -a` 同时输出到屏幕和文件。文件在 `/tmp` 下，重启或定期清理后会丢失，留档先拷走。
 
 ### 备份恢复
-如遇到问题，可通过以下命令恢复备份文件：
+恢复备份：
 ```bash
 # 恢复备份示例
 mv external.backup.${BACKUP_TIMESTAMP} external
@@ -126,19 +126,17 @@ mv wine.backup.${BACKUP_TIMESTAMP} wine
 
 ## 故障排除
 
-**容器列表为空。** 脚本判定容器的依据是 `drive_c/windows/system32` 目录是否存在，只建了容器还没装任何 Windows 程序时该目录尚未生成，所以不会被列出；此时用手动输入完整路径绕过，或先在容器里装一次目标程序。
+**容器列表为空。** 判定依据是 `drive_c/windows/system32` 目录是否存在，只建了容器还没装任何 Windows 程序时该目录尚未生成，不会被列出；用手动输入完整路径绕过，或先在容器里装一次目标程序。
 
-**同一容器出现两个同名条目。** 脚本除了 `~/Library/Application Support/CrossOver/Bottles`，还会搜旧版路径 `~/.cxoffice`，旧版条目显示名会附加「 (旧版)」后缀。判重按容器路径而不是显示名，因此新旧同名容器都会被列出——按你的游戏实际所在的那个选，选错的那个不会得到更新但也不会被破坏。
+**同一容器出现两个同名条目。** 除 `~/Library/Application Support/CrossOver/Bottles` 外还会搜旧版路径 `~/.cxoffice`，旧版条目显示名附加「 (旧版)」后缀。判重按容器路径而非显示名，新旧同名容器都会列出——按游戏实际所在的那个选，选错的那个不会得到更新但也不会被破坏。
 
-**提示未找到 CrossOver 安装目录。** 报错会打印脚本预期的路径，非默认安装位置需要改脚本顶部的 `CROSSOVER_GPTK_DIR`。
+**提示未找到 CrossOver 安装目录。** 报错会打印预期路径，非默认安装位置需改脚本顶部的 `CROSSOVER_GPTK_DIR`。
 
-**MD5 校验失败。** 这一步发生在复制完成之后，脚本此时不会自动还原，只汇总失败数并询问是否继续。选继续意味着应用包里留着摘要不符的文件，CrossOver 能不能正常启动取决于具体是哪个文件；稳妥做法是选退出，再按备份时间戳手工移回 `external.backup.<时间戳>` 与 `wine.backup.<时间戳>`，重新挂载评估环境镜像后重跑。
+**MD5 校验失败。** 发生在复制完成之后，脚本不自动还原，只汇总失败数并询问是否继续。选继续意味着应用包里留着摘要不符的文件，CrossOver 能否启动取决于具体是哪个文件；稳妥做法是选退出，按备份时间戳手工移回 `external.backup.<时间戳>` 与 `wine.backup.<时间戳>`，重新挂载评估环境镜像后重跑。
 
-复制本身失败（`ditto` 报错或复制后目录缺失）走的是另一条路径：脚本会自己把备份移回去并退出，这种情况不需要手工恢复，直接排查镜像挂载后重跑即可。
+复制本身失败（`ditto` 报错或复制后目录缺失）走另一条路径：脚本自己把备份移回去并退出，不需要手工恢复，排查镜像挂载后重跑即可。
 
 ## 完整脚本代码
-
-以下是完整的 crossover-gptk3.sh 脚本代码：
 
 ```bash
 #!/bin/bash
@@ -654,10 +652,8 @@ echo "${GREEN}•${NC} 查看日志命令：${YELLOW}cat ${LOG_FILE}${NC}"
 
 ## 总结
 
-`crossover-gptk3.sh` 把 GPTK3 文件替换这件事从多步手工操作收敛为一次执行，并内置带时间戳备份、MD5 完整性校验、失败回滚与全量日志，替换出错时可据日志与备份目录恢复到改动前状态。
+`crossover-gptk3.sh` 把 GPTK3 文件替换从多步手工操作收敛为一次执行，内置带时间戳备份、MD5 完整性校验、失败回滚与全量日志，出错时可据日志与备份恢复到改动前状态。
 
-使用前请确认三项前置条件均已满足（CrossOver Preview 已安装、GPTK 安装包与评估环境镜像均已挂载），并在首次运行时留意容器选择环节：DLL 只会复制到所选容器，选错容器不影响文件替换本身，但目标游戏不会获得更新。
+使用前确认三项前置条件均已满足（CrossOver Preview 已安装、GPTK 安装包与评估环境镜像均已挂载），并留意容器选择环节：DLL 只复制到所选容器，选错容器不影响文件替换本身，但目标游戏不会获得更新。
 
----
-
-**重要提醒**：此脚本涉及系统文件操作，请在使用前确保了解其功能并做好数据备份。作者不对因使用此脚本造成的任何损失负责。
+**免责**：脚本涉及系统文件操作，使用前了解其功能并做好数据备份，作者不对使用造成的任何损失负责。

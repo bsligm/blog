@@ -1,7 +1,7 @@
 ---
 title: Chromium 内核 113 STATUS_STACK_BUFFER_OVERRUN 解决方案
 date: 2023-05-18 11:00:00
-updated: 2026-11-19 15:30:00
+updated: 2026-11-20 12:00:00
 tags:
   - Chromium
   - 浏览器
@@ -12,22 +12,15 @@ categories:
   - 基础设施
   - 桌面维护
 keywords: Chromium, Chrome, Edge, STATUS_STACK_BUFFER_OVERRUN, Exploit Protection, 硬件强制堆栈保护, 组策略
-description: 处理 Chromium 内核升级到 v113 后 Chrome/Edge 启动即崩溃并返回 STATUS_STACK_BUFFER_OVERRUN 的问题，提供 Exploit Protection 单机处置与 AD 组策略按映像名下发两种方式。
+description: Chromium 内核升级 v113 后 Chrome/Edge 启动崩报 STATUS_STACK_BUFFER_OVERRUN，处置：单机 Exploit Protection 仅审核，企业 AD 组策略按映像下发 IFEO 缓解。
 cover: /medias/featureimages/3.jpg
 toc: true
 copyright: true
 ---
 
-2023 年 5 月 Chromium 内核升级到 v113 后，部分终端上的 Chrome/Edge 无法启动，页面或进程直接返回「喔唷，崩溃了」与 `STATUS_STACK_BUFFER_OVERRUN`。该问题在域内环境中会批量出现，直接阻断依赖浏览器的业务系统入口。
+2023 年 5 月 Chromium 内核升级 v113 后，部分终端的 Chrome/Edge 无法启动：标签页提示「喔唷，崩溃了，此网页出现问题」，进程异常终止，错误码 `STATUS_STACK_BUFFER_OVERRUN`。域内环境会批量出现，直接阻断依赖浏览器的业务系统入口。
 
-## 问题描述
-
-崩溃时的两类表现：
-
-- 标签页提示「喔唷，崩溃了，此网页出现问题」
-- 进程异常终止，错误码 `STATUS_STACK_BUFFER_OVERRUN`
-
-微软社区讨论中把它描述为「堆栈溢出」，但 `STATUS_STACK_BUFFER_OVERRUN`（`0xC0000409`）实际是 Windows 在**控制流防护 CFG 与硬件强制堆栈保护等 exploit 防护机制命中时的快速失败（fast-fail）**，由系统主动终止进程，并非传统意义上写穿栈边界导致的栈溢出。论坛说法描述的是表象，处置手段正是针对这套防护机制。
+微软社区把它描述为「堆栈溢出」，但 `STATUS_STACK_BUFFER_OVERRUN`（`0xC0000409`）实际是 **Windows 在控制流防护 CFG 与硬件强制堆栈保护等 exploit 防护机制命中时的快速失败（fast-fail）**，由系统主动终止进程，并非写穿栈边界的传统栈溢出。论坛说法是表象，处置针对的正是这套防护机制。
 
 参考：[微软社区 — Edge 浏览器崩溃讨论](https://learn.microsoft.com/zh-hans/answers/questions/8007f833-2959-419a-8408-e0cc0bfcbd5d/microsoft?forum=microsoftedge-all&referrer=answers)
 
@@ -45,7 +38,7 @@ copyright: true
 4. 展开 **硬件强制实施的堆栈保护**
 5. 勾选 **替代系统设置**，选择 **仅审核**
 
-「仅审核」表示防护命中时只产生事件而不终止进程，因此浏览器可正常启动，同时在事件日志中保留命中记录，便于后续确认根因。
+「仅审核」表示防护命中时只产生事件不终止进程：浏览器可正常启动，事件日志保留命中记录便于确认根因。
 
 ![Windows安全中心配置步骤1](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/image-20230607114706037.png "添加Chrome程序到保护列表")
 
@@ -59,7 +52,7 @@ copyright: true
 
 ## 批量解决方案
 
-域内出现大面积同类报错时，逐台配置 Exploit Protection 不可持续。可把等效设置落到注册表的 IFEO（Image File Execution Options）缓解策略键上，通过 AD 组策略按映像统一下发。
+域内大面积同类报错时，逐台配置不可持续。把等效设置落到注册表 IFEO（Image File Execution Options）缓解策略键，通过 AD 组策略按映像统一下发。
 
 ### 1. 创建并链接组策略对象
 
@@ -107,7 +100,7 @@ copyright: true
 
 ![配置MitigationOptions注册表项](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/image-20230607115944451.png "配置MitigationOptions注册表项")
 
-两个键都是同一布局的缓解策略位图，分工不同：`MitigationOptions` 决定策略是否对该映像**强制生效**，`MitigationAuditOptions` 决定策略在**未强制时是否仅记录审计事件**。两者是相互独立的值，位图结构一致，因此示例中取相同数值，且需分别创建。位图中具体某一位对应哪种缓解机制由 Windows 版本定义，微软未给出稳定公开映射，**不建议手工修改数值本身**。
+两个键都是同一布局的缓解策略位图，分工不同：`MitigationOptions` 决定策略是否对该映像**强制生效**，`MitigationAuditOptions` 决定策略**未强制时是否仅记录审计事件**。两者相互独立、位图结构一致，故示例取相同数值且需分别创建。位图中某位对应哪种缓解机制由 Windows 版本定义，微软未给出稳定公开映射，**不建议手工修改数值本身**。
 
 Edge 终端需按同样方式再建一组，只把键路径末段换成 `msedge.exe`。
 
@@ -123,14 +116,13 @@ gpupdate /force
 
 ## 注意事项
 
-1. 上述配置会削弱目标浏览器进程的堆栈保护强度，属于临时可用性处置，不建议长期保留在生产终端
-2. 生产环境批量下发前，先在测试 OU 验证
-3. 分批次 rollout，控制单次影响面
-4. 确保客户端能正常联系域控制器取得策略，否则配置不会生效
-5. 定期复查该 GPO 的适用性：一旦上游版本修复，应及时撤销而不是长期压制防护
+- 配置削弱目标浏览器进程的堆栈保护强度，属临时可用性处置，不建议长期保留在生产终端
+- 批量下发前先在测试 OU 验证，再分批 rollout 控制影响面
+- 客户端须能正常联系域控制器取得策略，否则不生效
+- 定期复查 GPO 适用性：上游版本修复后及时撤销，不长期压制防护
 
 ## 总结
 
-`STATUS_STACK_BUFFER_OVERRUN` 是 exploit 防护命中后的快速失败，不是真正的栈溢出。单机在 Exploit Protection 中把目标映像的「硬件强制实施的堆栈保护」改为仅审核即可恢复；企业环境把等效的 IFEO 缓解策略通过 GPO 按映像下发，`chrome.exe` 与 `msedge.exe` 需分别配置。
-
-这是绕开防护触发的临时手段，应跟踪 Chromium 与微软的后续版本，在上游修复后撤销配置并恢复默认防护。
+- `STATUS_STACK_BUFFER_OVERRUN` 是 exploit 防护命中后的快速失败，不是真正的栈溢出；
+- 单机：Exploit Protection 中把目标映像「硬件强制实施的堆栈保护」改为仅审核；企业：等效 IFEO 缓解策略经 GPO 按映像下发，`chrome.exe` 与 `msedge.exe` 分别配置；
+- 临时处置，跟踪 Chromium 与微软后续版本，上游修复后撤销 GPO、恢复默认防护。

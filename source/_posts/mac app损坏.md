@@ -1,7 +1,7 @@
 ---
 title: macOS 提示"App 已损坏，无法打开"的多种解决方法
 date: 2021-04-29 11:00:00
-updated: 2026-11-19 15:30:00
+updated: 2026-11-20 12:00:00
 tags:
   - macOS
   - Helpdesk
@@ -10,13 +10,13 @@ categories:
   - 桌面维护
   - 系统运维
 keywords: macOS, App损坏, Gatekeeper, spctl, xattr, 隔离属性, 隐私与安全性
-description: 处理 macOS 提示「App 已损坏，无法打开，你应该将它移到废纸篓」的多种方法，涵盖 Gatekeeper 全局设置调整、单应用隔离属性移除与不同 macOS 版本的路径差异。
+description: macOS 提示「App 已损坏，无法打开，你应该将它移到废纸篓」的处置：多数是 Gatekeeper 拦截而非真损坏，先移除单应用隔离属性或右键放行，必要时临时 spctl 关闭全局评估，放行前先用 spctl -a 确认拦截原因。
 cover: /medias/featureimages/8.jpg
 toc: true
 copyright: true
 ---
 
-在 macOS 上安装软件时，可能出现「XXXX 已损坏，无法打开。你应该将它移到废纸篓。」的提示，应用被直接拒绝启动。这是 Gatekeeper 与隔离属性（quarantine）机制的共同结果，本意是阻止未公证来源的可执行文件运行，但也会拦住来源可信的合法软件。
+在 macOS 上安装或打开应用时，可能出现「XXXX 已损坏，无法打开。你应该将它移到废纸篓。」的提示，应用被直接拒绝启动。这是 Gatekeeper 与隔离属性（quarantine）机制的共同结果：本意是阻止未公证来源的可执行文件运行，也会拦住来源可信的合法软件。
 
 先说明结论：绝大多数此类报错并非文件真的损坏，而是 Gatekeeper 拦截。优先用方法三（只处理单个应用），只在确有需要时临时放开全局设置。
 
@@ -54,19 +54,19 @@ copyright: true
 
 ### 方法二：用终端命令显示「任何来源」
 
-在终端（`Command + 空格` 唤起 Spotlight，输入「终端」回车）执行：
+在终端执行：
 
 ```bash
 sudo spctl --master-disable
 ```
 
-输入当前用户密码后执行。用下面命令确认状态，输出 `assessments disabled` 表示 Gatekeeper 评估已关闭：
+用下面命令确认状态，输出 `assessments disabled` 表示 Gatekeeper 评估已关闭：
 
 ```bash
 spctl --status
 ```
 
-该命令改变的是整机安全评估策略，作用范围大，安装完成后建议恢复：
+改变的是整机安全评估策略，作用范围大，安装完成后恢复：
 
 ```bash
 sudo spctl --master-enable
@@ -74,35 +74,35 @@ sudo spctl --master-enable
 
 ### 方法三：只处理单个应用
 
-不想放开全局设置时，仅对目标应用移除隔离属性：
+仅对目标应用移除隔离属性：
 
 ```bash
 sudo xattr -rd com.apple.quarantine /Applications/应用名称.app
 ```
 
-把「应用名称」替换为实际名称（路径含空格需用引号包裹）。若执行后仍提示损坏，说明拦截点不只在顶层包：检查 App 内部可执行文件是否带有独立的隔离属性，并确认代码签名状态：
+把「应用名称」替换为实际名称（路径含空格需引号包裹）。执行后仍提示损坏，说明拦截点不止顶层包：检查内部可执行文件是否带有独立隔离属性，并确认代码签名状态：
 
 ```bash
 codesign --verify --deep --strict --verbose=2 /Applications/应用名称.app
 xattr -lr /Applications/应用名称.app
 ```
 
-也可以不改任何设置，直接在 Finder 中右键应用图标 →「打开」→ 在确认对话框中再次点击「打开」，由用户显式放行这一次。
+也可以不改任何设置：Finder 中右键应用 →「打开」→ 确认对话框中再点「打开」，由用户显式放行这一次。
 
 ### 方法四：重新获取安装包
 
-若上述方法均无效，才考虑文件本体损坏：从官方渠道重新下载，确保传输过程完整，并校验官方发布的校验值后再安装。
+上述方法均无效时，才考虑文件本体损坏：从官方渠道重新下载，校验官方发布的校验值后再安装。
 
 ## 不同 macOS 版本的差异
 
-> 以下差异基于 macOS 10.15 Catalina 时代的实际行为整理，截至撰写时。Apple 在后续版本中持续收紧 Gatekeeper 并调整设置界面文案，新版上的具体开关位置与生效方式存在变化可能，实操以当前系统的实际界面为准。
+> 以下差异基于 macOS 10.15 Catalina 时代的实际行为整理。Apple 在后续版本中持续收紧 Gatekeeper 并调整设置界面文案，实操以当前系统的实际界面为准。
 
 - **macOS 10.15 Catalina 及更高**：仅默认放行已签名且已公证的应用；「任何来源」需显式开启；对未公证应用的拦截更严格
 - **macOS 10.14 Mojave 及更早**：「任何来源」默认可见，安全评估相对宽松
 
 ## 放行之前先确认拦截原因
 
-上面几种方法都在绕过判定，动手前值得先花一分钟看清 Gatekeeper 到底拒了什么，不同原因的处理方式完全不同：
+上面几种方法都在绕过判定，动手前先花一分钟看清 Gatekeeper 到底拒了什么，不同原因的处理方式完全不同：
 
 ```bash
 spctl -a -vvv -t execute /Applications/应用名称.app
@@ -111,9 +111,9 @@ codesign -dv --verbose=4 /Applications/应用名称.app 2>&1 | head -20
 
 `spctl -a` 返回 `rejected` 时看后面的原因：涉及 `signature` 的拒绝说明包本身没有可用签名，走公证流程无望，只能显式放行或换版本；涉及公证（notarization）的拒绝说明签名有效但 Apple 没为这个版本做过公证，通常是开发者发布时漏了提交。
 
-`codesign` 用来判断绕过是否安全：签名有效且 TeamIdentifier 是开发者官方团队 ID 时，移除隔离属性的风险可控；若输出显示签名无效、`code object is not signed at all`，或只有 ad-hoc 签名，那这条报错就不是误拦，不该放行。
+`codesign` 判断绕过是否安全：签名有效且 TeamIdentifier 是开发者官方团队 ID 时，移除隔离属性风险可控；签名无效、`code object is not signed at all` 或只有 ad-hoc 签名，这条报错就不是误拦，不该放行。
 
-需要系统侧的判定记录时，Gatekeeper 的判定过程记在 `syspolicyd` 的 `gk` 类别下：
+系统侧的判定记录在 `syspolicyd` 的 `gk` 类别下：
 
 ```bash
 log show --last 10m --style compact \

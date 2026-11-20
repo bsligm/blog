@@ -1,112 +1,82 @@
 ---
 title: Ubuntu 安装英伟达驱动与 CUDA
 date: 2023-11-09 11:40:00
-updated: 2026-11-19 15:30:00
+updated: 2026-11-20 12:00:00
 tags:
   - Ubuntu
   - Linux
 categories:
   - 系统运维
-keywords: Ubuntu, 英伟达驱动, CUDA, GPU, Linux 驱动安装
-description: 在 Ubuntu 上安装 NVIDIA 专有驱动与 CUDA 工具包：runfile 安装器的 DKMS、X 配置、32 位兼容库三项取舍，CUDA 版本不得高于 nvidia-smi 报告值的约束，以及 nouveau 冲突与 Secure Boot 导致加载失败的排查。
+keywords: Ubuntu, 英伟达驱动, CUDA, runfile 安装, DKMS, nouveau, Secure Boot
+description: Ubuntu 上用 runfile 安装 NVIDIA 专有驱动与 CUDA 工具包：停图形界面再装、安装器三处取舍（32 位库/X 配置/DKMS）、CUDA 版本不得高于 nvidia-smi 上限，nouveau 屏蔽与 Secure Boot 的排查，环境变量与多版本共存的坑。
 cover: /medias/featureimages/2.jpg
 toc: true
 copyright: true
 ---
 
-在 Ubuntu 上启用 NVIDIA GPU 的并行计算能力，需依次安装专有驱动与 CUDA 工具包：驱动决定可用的最高 CUDA 版本，CUDA 提供编译器与运行库。本文适用于带独立 NVIDIA GPU 的 Ubuntu 主机，覆盖驱动安装、CUDA 安装、环境变量配置与常见失败排查；操作会修改内核模块与系统级配置，建议先在测试机验证。
+NVIDIA GPU 在 Ubuntu 上要跑起来分两步：先装专有驱动（决定可用的最高 CUDA 版本），再装 CUDA 工具包（编译器与运行库）。这篇覆盖 runfile 安装全过程与常见失败排查；操作会改内核模块和系统级配置，建议先在测试机验证。
 
-## 准备阶段
+## 准备
 
-### 1. 确认硬件兼容性
+1. 按 GPU 型号在[NVIDIA 驱动下载页](https://www.nvidia.cn/Download/index.aspx?lang=cn)确认支持的驱动版本并下载 `.run` 文件。
 
-访问英伟达官网确认您的 GPU 型号支持的驱动版本：
-[NVIDIA 驱动下载页面](https://www.nvidia.cn/Download/index.aspx?lang=cn)
+![NVIDIA 驱动下载页面示例](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202311091122261.png "NVIDIA驱动下载页面示例")
 
-### 2. 检查系统依赖
-
-确保 Ubuntu 系统已安装必要的编译工具：
+2. 装编译工具（runfile 现场编译内核模块）：
 
 ```bash
 sudo apt update
 sudo apt install gcc g++ make
 ```
 
-### 3. 下载驱动文件
+## 安装驱动
 
-从英伟达官网下载适用于您 GPU 型号的驱动程序文件。
-
-![NVIDIA 驱动下载页面示例](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202311091122261.png "NVIDIA驱动下载页面示例")
-
-## 安装英伟达驱动
-
-### 1. 上传驱动文件
-
-将下载的驱动文件上传到 Ubuntu 系统中。
-
-### 2. 添加执行权限
-
-为驱动文件添加执行权限：
+把 `.run` 文件上传到目标机后：
 
 ```bash
 chmod +x NVIDIA-Linux-*.run
 ```
 
-### 3. 执行驱动安装
-
-安装 `.run` 前需先停止图形界面并切到纯文本控制台，否则安装器会因显示服务占用 GPU 而失败（按实际显示管理器替换服务名）：
+安装前必须停图形界面、切纯文本控制台，否则显示服务占着 GPU，安装器直接失败（按实际显示管理器替换服务名）：
 
 ```bash
 sudo systemctl stop gdm      # 或 lightdm / sddm
 sudo init 3                  # 切换至多用户文本模式
 ```
 
-再运行驱动安装程序：
+再运行安装程序：
 
 ```bash
 sudo ./NVIDIA-Linux-*.run
 ```
 
-安装器的交互界面里，真正需要做的取舍只有三处：
+交互界面里真正要做的取舍只有三处，其余保持默认：
 
-- **是否勾选 "Install NVIDIA's 32-bit compatibility libraries"**。不装 32 位兼容库的话，Steam/Wine 等 32 位程序调用 GPU 会失败；纯计算服务器可以不装。
-- **是否自动更新 X 配置**。Docker、调度器或容器里使用 GPU 时不要动 `xorg.conf`，选 No，否则容器内 `nvidia-container-runtime` 与宿主的设备映射可能不一致。
-- **是否注册 DKMS**。选 Yes 后内核升级会自动重编译驱动模块；选 No 就要自己在每次内核升级后重跑安装程序，这是生产机驱动突然失联的常见原因。
+- **32-bit compatibility libraries**：不装的话 Steam/Wine 等 32 位程序调 GPU 会失败；纯计算服务器可以不装。
+- **是否自动更新 X 配置**：Docker/调度器/容器里用 GPU 时选 No，不要动 `xorg.conf`，否则 `nvidia-container-runtime` 与宿主的设备映射可能不一致。
+- **是否注册 DKMS**：选 Yes，内核升级自动重编译驱动模块；选 No 就要每次内核升级后手动重跑安装程序——这是生产机驱动突然失联的常见原因。
 
-其余选项（安装路径、32 位库路径等）保持默认即可。
-
-### 4. 验证安装结果
-
-重启系统后，验证驱动是否安装成功：
+重启后验证：
 
 ```bash
 nvidia-smi
 ```
 
-如果安装成功，将显示 GPU 信息和驱动版本：
+正常出表、显示 GPU 与驱动版本即为成功：
 
 ![nvidia-smi 命令输出示例](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202311091238068.png "nvidia-smi命令输出示例")
 
 ## 安装 CUDA 工具包
 
-CUDA 是英伟达提供的并行计算平台和编程模型，用于开发 GPU 加速应用程序。
-
-### 1. 确认 CUDA 版本兼容性
-
-通过`nvidia-smi`命令确认支持的 CUDA 版本：
+先看 `nvidia-smi` 右上角的 `CUDA Version`——这是**驱动支持的上限**，装的工具包版本不能高于它：
 
 ![CUDA 版本兼容性检查](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202311091241712.png "CUDA版本兼容性检查")
 
-### 2. 下载 CUDA 安装包
-
-访问 CUDA 官方归档页面选择合适的版本：
-[CUDA Toolkit Archive](https://developer.nvidia.com/cuda-toolkit-archive)
+到[CUDA Toolkit Archive](https://developer.nvidia.com/cuda-toolkit-archive)选版本：
 
 ![CUDA 版本选择页面](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202311091241098.png "CUDA版本选择页面")
 
-### 3. 下载并安装 CUDA
-
-使用 runfile 方式安装 CUDA。下文 `12.2.2` 与 `535.104.05` 为示例版本，runfile 文件名含具体版本号，实际以 CUDA Toolkit Archive 页面选择结果为准：
+runfile 方式安装，下文 `12.2.2` 与 `535.104.05` 为示例版本，以实际选择为准：
 
 ```bash
 # 下载run文件
@@ -116,21 +86,17 @@ wget https://developer.download.nvidia.com/compute/cuda/12.2.2/local_installers/
 sudo sh cuda_12.2.2_535.104.05_linux.run
 ```
 
-安装过程中注意：
-- 取消驱动程序的安装（如果已安装最新驱动）
-- 选择需要的组件进行安装
+安装时两处注意：驱动已装好就**取消勾选驱动**，避免覆盖；只选需要的组件。
 
 ![CUDA 安装界面示例](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202311091258885.png "CUDA安装界面示例")
 
-### 4. 配置环境变量
-
-编辑 bash 配置文件：
+配置环境变量：
 
 ```bash
 sudo vim ~/.bashrc
 ```
 
-在文件末尾添加以下环境变量（路径根据实际安装情况调整）：
+文件末尾添加（路径按实际安装情况调整）：
 
 ```bash
 # CUDA环境变量配置（请根据实际安装路径调整）
@@ -139,7 +105,7 @@ export PATH=$CUDA_HOME/bin${PATH:+:${PATH}}
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 ```
 
-使配置生效：
+生效并让动态链接器收录运行库目录：
 
 ```bash
 source ~/.bashrc
@@ -148,28 +114,26 @@ echo "/usr/local/cuda-12.2/lib64" | sudo tee /etc/ld.so.conf.d/cuda.conf
 sudo ldconfig
 ```
 
-### 5. 验证 CUDA 安装
-
-检查 CUDA 编译器版本：
+验证：
 
 ```bash
 nvcc -V
 ```
 
-成功安装后将显示 CUDA 编译器版本信息：
+出版本信息即成功：
 
 ![nvcc 命令输出示例](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202311091305908.png "nvcc命令输出示例")
 
-## 常见问题及解决方案
+## 常见问题
 
 ### 1. 驱动安装失败
 
-如果驱动安装失败，常见原因有两类：
+两类常见原因：
 
-- Secure Boot 启用：未签名的内核模块会被拒绝加载。可在 BIOS 中禁用 Secure Boot，或按安装器提示登记 MOK（Machine Owner Key）后重启完成签名。
-- 内核模块冲突：开源 nouveau 驱动与 NVIDIA 专有驱动冲突，需先屏蔽 nouveau。
+- **Secure Boot 启用**：未签名的内核模块被拒绝加载。BIOS 里禁用 Secure Boot，或按安装器提示登记 MOK（Machine Owner Key）后重启完成签名。
+- **nouveau 冲突**：开源 nouveau 与专有驱动不能共存，先屏蔽 nouveau。
 
-屏蔽 nouveau 驱动（注意：屏蔽开源 nouveau 与卸载 NVIDIA 专有驱动是两件事，此处需要的是前者）：
+屏蔽 nouveau（注意与"卸载 NVIDIA 专有驱动"是两件事，此处只要前者）：
 
 ```bash
 # 若此前装过 NVIDIA 官方驱动，先彻底卸载
@@ -183,7 +147,7 @@ sudo update-initramfs -u
 sudo reboot
 ```
 
-重启后确认 nouveau 已不再加载、Secure Boot 状态符合预期：
+重启后确认：
 
 ```bash
 lsmod | grep nouveau   # 无输出即为已屏蔽
@@ -192,20 +156,17 @@ mokutil --sb-state     # 确认 Secure Boot 状态
 
 ### 2. CUDA 版本不匹配
 
-`nvidia-smi` 输出的 `CUDA Version` 表示驱动支持的最高 CUDA 版本，安装更高的 CUDA 工具包会导致运行时不可用。需保证 CUDA 工具包版本不高于该值，否则升级驱动或降级 CUDA。
+`nvidia-smi` 的 `CUDA Version` 是驱动支持的最高版本，工具包装得比它高就运行时不可用。要么升驱动，要么降 CUDA。
 
-### 3. 安装后命令找不到
+### 3. 安装后 `nvcc` 找不到
 
-`nvcc: command not found` 通常是环境变量未生效或路径未收录：先执行 `source ~/.bashrc` 并确认 `echo $CUDA_HOME` 指向实际安装目录；若依赖动态链接器收录，确认 `/etc/ld.so.conf.d/cuda.conf` 存在后重新执行 `sudo ldconfig`，可用 `ldconfig -p | grep cudart` 验证。
+通常是环境变量未生效或路径未收录：`source ~/.bashrc` 后确认 `echo $CUDA_HOME` 指向实际安装目录；依赖动态链接器的话确认 `/etc/ld.so.conf.d/cuda.conf` 存在、重跑 `sudo ldconfig`，用 `ldconfig -p | grep cudart` 验证。
 
 ## 总结
 
-驱动和 CUDA 是分两步落地的：先有能加载的内核模块，再谈工具包版本。`nvidia-smi` 正常出表是第一步的验收线，`nvcc -V` 能出版本是第二步的验收线，两条都过了才算环境可用。
+两条验收线：`nvidia-smi` 正常出表（驱动能加载），`nvcc -V` 能出版本（工具包可用），都过了环境才算可用。
 
-版本关系上只有一个硬约束：CUDA 工具包版本不能高于 `nvidia-smi` 报出的 `CUDA Version`。那一项是驱动支持的上限，不是机器上已装的版本，这是新装环境最常见的翻车点——先装高版本 CUDA 再回头升驱动，比反过来代价大。
-
-安装之后仍要留意的三件事：
-
-1. **内核升级**。`apt upgrade` 换内核后驱动模块需要重新编译，用 `.run` 方式安装的驱动在这一步容易失联。生产机建议锁定内核小版本，或改用 DKMS / 发行版仓库里的 `nvidia-driver-*` 包。
-2. **`CUDA_HOME` 写死版本号**。多版本共存时 `/usr/local/cuda` 这个符号链接才是切换开关，直接写 `cuda-12.2` 会让切版本变成改 `.bashrc`。
-3. **临时环境不继承变量**。`sudo -i`、cron、systemd 服务和 CI runner 都不读 `~/.bashrc`，脚本里显式引用绝对路径或 `/etc/profile.d/` 更可靠。
+- **版本硬约束只有一个**：CUDA 工具包版本 ≤ `nvidia-smi` 报的 `CUDA Version`。那项是驱动支持的上限，不是已装版本——先装高版本 CUDA 再回头升驱动，比反过来代价大。
+- **内核升级会让 `.run` 装的驱动失联**，模块要重编译。生产机锁内核小版本，或改用 DKMS / 发行版仓库的 `nvidia-driver-*` 包。
+- **`CUDA_HOME` 别写死版本号**：多版本共存时 `/usr/local/cuda` 符号链接才是切换开关，写死 `cuda-12.2` 会让切版本变成改 `.bashrc`。
+- **临时环境不继承变量**：`sudo -i`、cron、systemd 服务、CI runner 都不读 `~/.bashrc`，脚本里显式用绝对路径或走 `/etc/profile.d/`。

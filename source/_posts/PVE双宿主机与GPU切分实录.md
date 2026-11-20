@@ -1,7 +1,7 @@
 ---
 title: PVE 落地与 GPU 切分实录：具身智能 S2 边缘推理、L40S vGPU 与 PRO 6000 MIG
 date: 2026-11-19 20:40:00
-updated: 2026-11-20 11:00:00
+updated: 2026-11-20 12:00:00
 tags:
   - Proxmox VE
   - vGPU

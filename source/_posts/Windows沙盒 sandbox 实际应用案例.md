@@ -1,7 +1,7 @@
 ---
 title: Windows沙盒 sandbox 实际应用案例
 date: 2023-03-04 11:00:00
-updated: 2026-11-19 15:30:00
+updated: 2026-11-20 12:00:00
 tags:
   - Windows 11
   - Helpdesk
@@ -10,27 +10,23 @@ categories:
   - 基础设施
   - 安全管理
 keywords: Windows沙盒, Sandbox, 安全隔离, 虚拟化, Flash Player, IE浏览器
-description: 用 Windows 沙盒解决真实 IT 支持问题的案例：通过 MappedFolders 与 LogonCommand 自动安装 Flash Player，在隔离环境中运行依赖 IE 的过时管理系统。
+description: 用 Windows 沙盒解决 IT 支持两难题：MappedFolders 映射安装脚本目录、LogonCommand 自动静默装 Flash Player，在隔离环境运行依赖 IE 的打印机联机认证后台，关窗即销毁。
 cover: /medias/featureimages/5.jpg
 toc: true
 copyright: true
 ---
 
-## 背景介绍
+IT 支持中常遇到一类两难需求：某个仍在使用的管理系统只兼容过时的浏览器与插件，而这些组件本身已不适合装在办公机上。本案例即属此类：打印机联机认证使用理光的格兰林系统，删除已注册 IC 卡时必须在 IE 中访问其后台，后台依赖 Flash Player 插件——Flash 已全面停止支持，存在已知安全风险且历史上捆绑软件较多，不应装在物理机上。
 
-IT 支持工作中常遇到一类两难需求：某个仍在使用的管理系统只兼容过时的浏览器与插件，而这些组件本身已不适合装在办公机上。
-
-本次案例即属此类：打印机联机认证使用理光的格兰林系统，删除已注册 IC 卡时必须在 IE 浏览器中访问其后台，而该后台依赖 Flash Player 插件。Flash Player 已全面停止支持，存在已知安全风险且历史上捆绑软件较多，不应安装在物理机上。
-
-处理思路是把「不安全的运行环境」与「主机」彻底分开：在 Windows 自带的沙盒中临时安装并运行所需组件，用完即销毁。落地方式是沙盒配置文件（`.wsb`）+ `MappedFolders` 映射脚本目录 + `LogonCommand` 自动执行安装，双击文件即可得到装好 Flash Player 的干净环境。
+思路是把「不安全的运行环境」与「主机」彻底分开：用 Windows 自带沙盒临时安装运行所需组件，用完即销毁。落地方式：沙盒配置文件（`.wsb`）+ `MappedFolders` 映射脚本目录 + `LogonCommand` 自动执行安装，双击即得装好 Flash Player 的干净环境。
 
 ## Windows 沙盒简介
 
-Windows 沙盒是 Windows 10 与 Windows 11 的 Pro/Enterprise 版本内置的轻量虚拟化环境：每次启动都是全新实例，关闭后本次会话的全部改动（含本案例临时安装的 Flash Player）随之消失，沙盒内装的软件不会残留到主机。
+Windows 沙盒是 Windows 10/11 Pro/Enterprise 内置的轻量虚拟化环境：每次启动都是全新实例，关闭后本次会话的全部改动（含临时安装的 Flash Player）随之消失，不残留到主机。
 
-沙盒内程序默认无法访问主机文件系统，唯一例外是通过 `MappedFolders` 显式映射进来的目录；本案例正是依靠这一例外把安装脚本送进沙盒。
+沙盒内程序默认无法访问主机文件系统，唯一例外是 `MappedFolders` 显式映射的目录，本案例靠它把安装脚本送进沙盒。
 
-需要注意，映射目录是**真实的读写通道**（可设为只读），因此映射范围应保持最小：只映射存放安装脚本的目录，绝不映射用户主目录或包含凭据的路径。
+映射目录是**真实的读写通道**（可设为只读），范围保持最小：只映射安装脚本目录，绝不映射用户主目录或含凭据的路径。
 
 官方文档参考：[Windows 沙盒配置指南 | Microsoft Learn](https://learn.microsoft.com/zh-cn/windows/security/threat-protection/windows-sandbox/windows-sandbox-configure-using-wsb-file)
 
@@ -40,7 +36,7 @@ Windows 沙盒是 Windows 10 与 Windows 11 的 Pro/Enterprise 版本内置的�
 
 ### 1. 启用 Windows 沙盒功能
 
-首先确保 Windows 沙盒功能已启用：
+确保 Windows 沙盒功能已启用：
 
 1. 打开「控制面板」→「程序」→「启用或关闭 Windows 功能」
 2. 勾选「Windows 沙盒」选项
@@ -48,7 +44,7 @@ Windows 沙盒是 Windows 10 与 Windows 11 的 Pro/Enterprise 版本内置的�
 
 ### 2. 编写批处理脚本
 
-创建批处理文件，用于在沙盒内自动完成「连接共享 → 取安装包 → 静默安装」：
+批处理脚本在沙盒内自动完成「连接共享 → 取安装包 → 静默安装」：
 
 ```batch
 @echo off
@@ -68,13 +64,13 @@ C:\Users\WDAGUtilityAccount\Downloads\flashplayer.exe /verysilent /suppressmsgbo
 - **`xcopy` 必须带 `/i /Y /Q`**：`LogonCommand` 是无人值守执行的，若目标目录不存在或需要覆盖确认，`xcopy` 会停在交互提问上，导致安装流程整体挂起。`/i` 在目标不存在且源为文件时按文件创建，`/Y` 抑制覆盖确认，`/Q` 关闭文件回显。
 - **路径统一为 `C:\Users\...`**：Windows 路径不区分大小写，但脚本与配置文件中的大小写混用会增加阅读与检索成本，统一写法更便于比对。
 
-将批处理文件保存在`C:\SandboxScripts`目录下：
+批处理文件保存在 `C:\SandboxScripts` 目录下：
 
 ![批处理脚本位置](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/image-20230303134422839.png "批处理脚本存储位置")
 
 ### 3. 编写沙盒配置文件
 
-创建.wsbs 格式的配置文件来定义沙盒环境：
+创建 `.wsb` 配置文件定义沙盒环境：
 
 ```xml
 <Configuration>
@@ -94,7 +90,7 @@ C:\Users\WDAGUtilityAccount\Downloads\flashplayer.exe /verysilent /suppressmsgbo
 </Configuration>
 ```
 
-将配置文件保存为`flashplayer.wsb`格式：
+保存为 `flashplayer.wsb`：
 
 > 上文脚本之所以绕道网络共享取安装包，是因为 `MappedFolders` 映射源被设为 `<ReadOnly>true</ReadOnly>`：映射目录在沙盒内不可写，无法把文件暂存过去，因此改为先把安装包取到沙盒自身可写的 `Downloads` 目录再执行（`LogonCommand` 直接执行只读目录中的 `.bat` 没有问题，执行只需要读权限）。如果不希望脚本携带共享凭据，可以去掉 `ReadOnly` 并由映射目录直接提供安装包，代价是沙盒对该主机目录获得写入面。
 
@@ -102,7 +98,7 @@ C:\Users\WDAGUtilityAccount\Downloads\flashplayer.exe /verysilent /suppressmsgbo
 
 ### 4. 运行沙盒环境
 
-双击执行`flashplayer.wsb`文件启动 Windows 沙盒，系统将自动：
+双击 `flashplayer.wsb` 启动沙盒，系统自动：
 
 1. 启动沙盒环境
 2. 映射指定文件夹
@@ -112,7 +108,7 @@ C:\Users\WDAGUtilityAccount\Downloads\flashplayer.exe /verysilent /suppressmsgbo
 
 ## 安全注意事项
 
-使用 Windows 沙盒处理此类问题时，需要注意以下安全事项：
+使用时的安全事项：
 
 1. **数据隔离**：沙盒与主机隔离，沙盒内的软件与配置不会写回主机系统。
 2. **临时性**：沙盒关闭后本次会话产生的数据全部丢弃，因此每次启动都需重新安装 Flash Player；若某次会话产生了需要保留的输出（如导出的配置、截图），必须在关闭前主动取出，否则不可恢复。

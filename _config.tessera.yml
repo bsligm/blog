@@ -149,3 +149,5 @@ aside:
     enable: false
   card_webinfo:
     enable: false
+  card_tags:
+    limit: 18

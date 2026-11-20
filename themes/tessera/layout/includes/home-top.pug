@@ -44,13 +44,83 @@
             if c.icon
               i.htop-cat-icon(class=c.icon)
   if bn && bn.enable !== false
-    - const bnStyle = bn.image ? `background-image:url(${url_for(bn.image)})` : 'background:linear-gradient(135deg,#1b1f3a,#425AEF)'
-    a.htop-recommend(href=url_for(bn.link || '/') style=bnStyle)
-      .htop-rec-mask
-      .htop-rec-info
-        if bn.tips
-          .htop-rec-tips= bn.tips
-        .htop-rec-title= bn.title
-      .htop-rec-btn
-        i.fas.fa-circle-arrow-right
-        span= bn.button || '更多推荐'
+    //- 站点实时状态台：脉冲动效 + 轨道环 + 实时时钟 + 统计 + 最新文轮播（零依赖，CSS/JS 内联）
+    - const featPosts = site.posts.sort('-date').limit(5).toArray()
+    .htop-console
+      .hc-head
+        .hc-live-dot
+        span LIVE
+        .hc-head-sep
+        span 站点状态
+      .hc-clock-row
+        span.hc-clock#hc-time
+        span.hc-date#hc-date
+      .hc-orbit(aria-hidden='true')
+        .hc-ring
+        .hc-orb.hc-orb-a
+        .hc-orb.hc-orb-b
+        .hc-orb.hc-orb-c
+        .hc-core
+          i.fas.fa-microchip
+      .hc-stats
+        a(href=url_for(config.archive_dir) + '/')
+          .hc-num(data-target=site.posts.length) 0
+          .hc-lbl 文章
+        a(href=url_for(config.tag_dir) + '/')
+          .hc-num(data-target=site.tags.length) 0
+          .hc-lbl 标签
+        a(href=url_for(config.category_dir) + '/')
+          .hc-num(data-target=site.categories.length) 0
+          .hc-lbl 分类
+      a.hc-featured#hc-featured(href=url_for(featPosts[0].path))
+        .hc-feat-label 置顶 · 最新
+        .hc-feat-title#hc-feat-title= featPosts[0].title
+        .hc-feat-dots
+          each p, i in featPosts
+            i(class=(i === 0 ? 'hc-dot-on' : ''))
+      .hc-foot
+        span ~ $ tessera --status
+        span.hc-cursor ▍
+      script.
+        (function () {
+          var timeEl = document.getElementById('hc-time')
+          var dateEl = document.getElementById('hc-date')
+          var featLink = document.getElementById('hc-featured')
+          var featTitle = document.getElementById('hc-feat-title')
+          var featured = #{JSON.stringify(featPosts.map(function (p) { return { t: p.title, l: p.path } }))}
+          var pad = function (n) { return n < 10 ? '0' + n : '' + n }
+          var week = '日一二三四五六'
+          function tick() {
+            var d = new Date()
+            if (timeEl) timeEl.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds())
+            if (dateEl) dateEl.textContent = d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate()) + ' 周' + week.charAt(d.getDay())
+          }
+          tick()
+          setInterval(tick, 1000)
+          document.querySelectorAll('.hc-num[data-target]').forEach(function (el) {
+            var target = parseInt(el.getAttribute('data-target'), 10) || 0
+            var t0 = null
+            function step(ts) {
+              if (!t0) t0 = ts
+              var p = Math.min((ts - t0) / 1200, 1)
+              el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)))
+              if (p < 1) requestAnimationFrame(step)
+            }
+            requestAnimationFrame(step)
+          })
+          var dots = Array.prototype.slice.call(document.querySelectorAll('#hc-featured .hc-feat-dots i'))
+          var fi = 0
+          if (featured.length > 1) {
+            setInterval(function () {
+              fi = (fi + 1) % featured.length
+              if (!featTitle) return
+              featTitle.style.opacity = 0
+              setTimeout(function () {
+                featTitle.textContent = featured[fi].t
+                if (featLink) featLink.href = featured[fi].l
+                featTitle.style.opacity = 1
+              }, 300)
+              dots.forEach(function (d, i) { d.classList.toggle('hc-dot-on', i === fi) })
+            }, 5000)
+          }
+        })();

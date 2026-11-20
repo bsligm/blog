@@ -9,14 +9,14 @@ tags:
 categories:
   - 系统运维
   - 安全管理
-keywords: JumpServer 企业版, PAM, 高鲁棒性, systemd timer, PostgreSQL 备份, 健康巡检, AD 组同步, AccessKey HMAC, 故障恢复演练
-description: 公司 PAM 入口 JumpServer 企业版的部署与加固实录：PVE 虚拟机承载与无密码运维通道、企业版选型与一次失败升级的教训、PostgreSQL 绑定 127.0.0.1 的取舍、每日原子备份与两分钟健康巡检的 systemd timer 体系、AD 组同步脚本的幂等设计、一次 API 500 故障的完整恢复过程，以及按对象编号管理的回退策略。
+keywords: JumpServer 企业版, PAM, 高鲁棒性, systemd timer, PostgreSQL 备份, 健康巡检, AD 组同步, LDAP 部门映射, AccessKey HMAC, AI Agent, JMS Admin API, AI Native, 故障恢复演练
+description: JumpServer 企业版从部署到 AI Native 改造：原子备份、两分钟巡检、AD 部门自动映射、一次 500 故障完整恢复，以及让 Codex 走 HMAC 签名 Admin API 纳管资产并录像审计。
 cover: /medias/featureimages/11.jpg
 toc: true
 copyright: true
 ---
 
-2023 年那篇[《JumpServer 单节点无外置数据库部署》](/2023/10/18/Jump%20server单节点无外置数据库部署/)解决的是「装起来」：一台 Linux、一套离线包、内置数据库，能登、能跳、能审计就算收工。这篇是公司环境的版本，解决的是「活得久」：同样的单节点形态，但部署理念换了一套——安装只是起点，备份要原子、巡检要分钟级、同步要幂等、回退要按对象、健康状态要能证明不是假绿。
+2023 年那篇[《JumpServer 单节点无外置数据库部署》](/2023/10/18/Jump%20server单节点无外置数据库部署/)解决的是「装起来」：一台 Linux、一套离线包、内置数据库，能登、能跳、能审计就算收工。这篇是公司环境的版本，解决的是「活得久、管得宽」：同样的单节点形态，但部署理念换了一套——安装只是起点，备份要原子、巡检要分钟级、部门归属要自动、回退要按对象、健康状态要能证明不是假绿，最后还要把管理员操作面整个开放给 AI Agent。
 
 环境一句话：PVE 单节点上的一台虚拟机，Ubuntu 26.04，JumpServer 企业版 v4.10.18，PostgreSQL 16 + Redis 7 内置，13 个组件容器，承载全公司的特权访问入口。地址、主机名、内部产品名均脱敏；所有容器名、端口、命令可直接照抄。
 
@@ -136,9 +136,13 @@ pg_restore --list /data/jumpserver/db_backup/jms-<时间戳>.dump  # 校验可�
 
 Zabbix 侧四个对象：原始状态、健康值、采样时间戳，再加异常与失鲜两条告警规则。失鲜规则盯时间戳不盯数值，专治「旧文件假绿」。
 
-### 3. AD 组同步（cron 每日 03:30，自研脚本）
+### 3. 身份层：LDAP 登录 + AD 部门自动映射（cron 每日 03:30，自研脚本）
 
-LDAP 只解决「用户能登录」，不解决「用户进对组」。自研同步脚本每天把 AD 组结构重算成 JumpServer 用户组，设计约束四条：
+身份分两层。第一层是登录：JumpServer 的 LDAP 认证直接对接 AD，80 个域用户零本地账号，Base DN 与过滤条件按部门 OU 收口——范围填小同步不到人，填大会把服务账号、停用账号一起拉进来，这是 LDAP 配置里最容易翻车的地方。
+
+第二层是部门归属：LDAP 只解决「能登录」，不解决「进对组」。自研同步脚本每天把 AD 的部门/组结构重算成 JumpServer 用户组，规则很直接——AD 里 OU=研发的人自动进 JMS 的 `dev` 组，OU=运维进 `ops` 组，脚本维护一份部门到组的映射表。入职加进 AD 对应 OU，第二天 03:30 同步跑完就自动出现在堡垒机对应组里，管理员不建任何账号；离职在 AD 禁用，脚本跳过禁用账号，自动从组里移出。
+
+设计约束四条：
 
 - **幂等**：全量重算 + 差异 PATCH，跑一百次和跑一次结果一样
 - **白名单**：`systemadmin` 等系统组永不触碰，脚本写错也不炸管理通道
@@ -173,6 +177,138 @@ Authorization: Signature keyId="<AK>", algorithm="hmac-sha256",
 
 还有一个更隐蔽的并发问题，当时准备补丁但按最小变更原则没有立即上生产：定时任务 `clean_orphan_session` 会把「尚未发送首次心跳的新建会话」误判为孤儿提前结束——会话实际在跑、录像还在写，数据库里却已标结束。补丁思路是给清理任务加 5 分钟宽限期，隔离环境复现竞态 + 5 项回归测试通过后才算数，等待生产任务进程重载窗口再上。**补丁没上生产之前，它只是补丁**。
 
+## Agent 通道：让 AI Agent 用 JMS API 干活
+
+堡垒机解决的是「人怎么安全地操作资产」。但运维动作越来越多由 AI Agent 发起——排障脚本、自动纳管、定期巡检。Agent 没有浏览器、没有 session cookie、没有鼠标，它只有一条路：API。
+
+### 认证：AccessKey HMAC-SHA256 签名
+
+JumpServer 的 Admin API 支持 AccessKey 认证。给 Agent 建一个专用服务账号，生成一对 AK/SK，之后每个请求都带签名头：
+
+```text
+Authorization: Signature keyId="<AK>", algorithm="hmac-sha256",
+  headers="(request-target) date",
+  signature="<base64(HMAC-SHA256(SK, '(request-target): <method> <path>\ndate: <date>'))>"
+
+Date: <RFC 1123 GMT 时间>
+```
+
+为什么不用 Token 或 Basic Auth：
+
+- **Token 要刷新、会过期**，Agent 长跑任务跑到一半 token 失效就断链。HMAC 签名无状态，AK/SK 不变就永远有效
+- **Basic Auth 把密码放每个请求头**，日志一漏全漏。HMAC 只泄露签名，SK 本身不上网
+- **签名绑定 `(request-target) + date`**，重放攻击的时间窗口被 date 卡死（服务端校验时间差）
+
+这套签名和上面 AD 组同步脚本用的是同一套——同步脚本就是 Agent 认证的第一次实战，跑了一年多没出过认证问题。
+
+### Agent 能干什么：管理员权限的 API 面
+
+JMS Admin API 把 Web 界面上管理员能做的操作全部暴露了。Agent 用同一个 AK/SK，能干的事包括：
+
+| 动作 | API 端点 | 说明 |
+| --- | --- | --- |
+| 添加资产 | `POST /api/v1/assets/assets/` | 指定地址、平台、协议，自动进入资产列表 |
+| 添加账号 | `POST /api/v1/assets/<id>/accounts/` | 给资产绑定登录凭据（用户名+密码/密钥） |
+| 创建授权 | `POST /api/v1/perms/asset-permissions/` | 把用户组 × 资产 × 账号绑成一条规则 |
+| 查询会话 | `GET /api/v1/terminal/sessions/` | 谁正在连哪台机器、什么状态 |
+| 结束会话 | `PATCH /api/v1/terminal/sessions/<id>/` | Agent 发现异常会话可以直接踢 |
+| 系统升级 | `POST /api/v1/settings/...` 或 `jmsctl upgrade` | 版本管理 |
+
+关键点是**管理员权限**：Agent 用 admin 角色的 AK/SK，操作等价于管理员在 Web 界面上点鼠标。纳管新服务器、给新入职员工开权限、结束异常会话——这些以前必须找一个有 Web 登录权限的人来点，现在 Agent 直接完成。
+
+### 实操：Codex 通过 JMS API 纳管资产
+
+一个完整的「Agent 纳管新资产」流程：
+
+```python
+import requests, hmac, hashlib, base64
+from email.utils import formatdate
+
+AK = "your-access-key-id"
+SK = "your-secret-key"
+BASE = "https://jms.example.com/api/v1"
+
+def sign(method, path, date):
+    string_to_sign = f"(request-target): {method.lower()} {path}\ndate: {date}"
+    sig = base64.b64encode(
+        hmac.new(SK.encode(), string_to_sign.encode(), hashlib.sha256).digest()
+    ).decode()
+    return f'Signature keyId="{AK}",algorithm="hmac-sha256",headers="(request-target) date",signature="{sig}"'
+
+def api_request(method, path, body=None):
+    date = formatdate(usegmt=True)
+    headers = {"Date": date, "Authorization": sign(method, path, date)}
+    if body: headers["Content-Type"] = "application/json"
+    return requests.request(method, BASE + path, json=body, headers=headers, timeout=30)
+
+# 1. 添加资产
+asset = api_request("POST", "/assets/assets/", {
+    "name": "新服务器-01",
+    "address": "10.0.2.50",
+    "platform": "Linux",
+    "protocols": [{"name": "ssh", "port": 22}],
+    "nodes": ["/运维/生产环境"]   # 资产节点 ID
+}).json()
+asset_id = asset["id"]
+
+# 2. 绑定登录账号
+api_request("POST", f"/assets/{asset_id}/accounts/", {
+    "name": "root",
+    "username": "root",
+    "secret": "the-password",   # 或 SSH 密钥
+    "secret_type": "password"
+})
+
+# 3. 授权给运维组
+api_request("POST", "/perms/asset-permissions/", {
+    "name": "运维组-新服务器-01",
+    "users": [],
+    "user_groups": ["<运维组ID>"],
+    "assets": [asset_id],
+    "accounts": ["root"],
+    "actions": ["connect", "upload", "download", "refresh"],
+    "date_expired": "2099-12-31"
+})
+
+# 4. 验证：回读授权规则
+rules = api_request("GET", f"/perms/asset-permissions/?name=运维组-新服务器-01")
+print(f"授权规则已创建: {rules.json()['count']} 条")
+```
+
+四步走完，一台新服务器从「裸 IP」变成「运维组可通过堡垒机 SSH 连接、有录像审计的纳管资产」。全程 Agent 完成，人只负责确认。
+
+### 宿主机 OS 账户：打通最后一环
+
+资产纳管只解决了「堡垒机能跳过去」。Agent 要真正操作宿主机（装补丁、改配置、重启服务），还需要宿主机 OS 层的凭据。两个来源：
+
+- **JMS 资产账号**：上面第 2 步绑定的 root 密码/密钥。Agent 从 JMS API 读取该账号的 secret，通过 SSH/RDP 协议网关（koko 2222 / razor 3389）建立连接
+- **独立凭据库**：宿主机管理员密码存在 Agent 的凭据库（如 `~/.config/` 下 mode 600 文件），不走 JMS 账号体系。适合宿主机本身不在 JMS 纳管范围的情况
+
+我们的实际做法是**双轨并行**：宿主机已纳管 JMS 的，Agent 走 JMS 账号（好处是每次连接都有录像审计）；未纳管的，走独立凭据库（好处是不受 JMS 故障影响）。后续方向是全部收口到 JMS 账号——**Agent 的每一次 OS 操作都落在堡垒机录像里**，这就是 AI Native 的执行审计层。
+
+### AI Native 闭环
+
+把上面三块拼起来，运维闭环变成：
+
+```
+人（自然语言）→ AI Agent（Codex）
+                    │
+                    ├── JMS Admin API（HMAC 签名）
+                    │     ├── 添加资产 + 账号 + 授权
+                    │     ├── 查询/结束会话
+                    │     └── 系统设置/升级
+                    │
+                    ├── SSH/RDP 协议网关（koko/razor）
+                    │     └── 宿主机 OS 操作（装补丁/改配置/重启）
+                    │
+                    └── 录像归档（每次连接自动录像）
+                          └── 审计层：谁（Agent）在什么时候对哪台机器做了什么
+```
+
+这比传统「人登录堡垒机 → 点鼠标 → 操作宿主机」多了两件事：**操作者可以是机器**（无头 Agent 不需要浏览器），**每一次操作都有录像**（Agent 干的事和人干的事审计标准一致）。
+
+未闭环：Agent 的 AK/SK 目前是 admin 全权限，还没有做按操作粒度收权（只给资产写权限不给用户管理权限）。下一步是 JMS 的角色权限体系拆细，给 Agent 一个「能管资产但不能改用户」的中间角色。
+
 ## 回退策略：按对象，不按整库
 
 所有加固项在动生产前先落备份，且备份分两层：
@@ -201,9 +337,13 @@ Authorization: Signature keyId="<AK>", algorithm="hmac-sha256",
 - **孤儿会话宽限补丁**在隔离环境验证完毕，待生产重载窗口
 - **授权规则回收机制**：存量规则接近永久有效且含个人名规则，收敛方案已定（独立账号优先、特权按需带有效期），执行未完成
 - **Zabbix 告警的通知送达**没做过故障演练。采集正常不等于告警真能到值班人手上
+- **Agent 权限粒度**：Agent 的 AK/SK 目前是 admin 全权限，还没拆出「能管资产不能改用户」的中间角色
+- **整库恢复演练**之外还差一次「Agent 全流程演练」：用 Agent 跑一遍 纳管→授权→SSH 操作→回读录像 的完整链路并在生产验收
 
 ## 小结
 
 单节点不丢人，丢人的是单节点装完就不管。这篇的四个 timer 加一套按对象的回退策略，本质是把「这台机器现在活着」变成「这台机器活着这件事可以被独立验证」——备份能读、巡检能证明在跑、巡检挂了也会响、回退按对象取原值。
+
+再往前一步是把操作者也变成可验证的：AD 部门映射让「人进对组」自动化，HMAC 签名让 Agent 能拿着和同步脚本同一套认证直接调管理员 API，录像归档让 Agent 干的每一件事都有审计留痕。堡垒机从「人的入口」变成「人和 Agent 共用的受控执行层」，这是这套环境里 AI Native 落得最实的一块。
 
 下一阶段的增量是隔离备份目标和整库恢复演练，把「未闭环」清单上的前两条划掉。届时堡垒机的故障域才算真正从单盘里搬出去。

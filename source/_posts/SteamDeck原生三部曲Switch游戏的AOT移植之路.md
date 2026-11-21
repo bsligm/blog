@@ -1,7 +1,7 @@
 ---
-title: Steam Deck 原生三部曲：三款 Switch 游戏的 AOT 移植之路
+title: Steam Deck 原生移植三部曲：异界锁链、战神 3 与血源诅咒的 AOT 重编译
 date: 2026-11-06 21:00:00
-updated: 2026-11-21 11:00:00
+updated: 2026-11-22 21:00:00
 tags:
   - Steam Deck
   - 游戏移植
@@ -12,13 +12,13 @@ categories:
   - 桌面维护
   - 系统维护
 keywords: Steam Deck, Switch, AOT 重编译, LLVM, SPIR-V, Vulkan, Horizon, 异界锁链, 战神3, 血源诅咒, RADV, 遥操测试
-description: 三款 Switch 游戏（异界锁链/战神3/血源诅咒）的 PC 重编译项目 AOT 搬上 Steam Deck 做"准原生"：三堵墙各拆一遍，Deck 是验收场不是工地——candidate 环境白名单重建、bwrap 只读根、存档 sha256 硬断言，以及 60fps 开关不生效的诊断路径。
+description: 一 Switch 两 PS4（异界锁链 / 战神 3 Remastered / 血源诅咒）搬上 Steam Deck 做"准原生"：三堵墙各拆一遍，Deck 是验收场不是工地——candidate 环境白名单重建、bwrap 只读根、存档 sha256 硬断言，以及 60fps 开关不生效的诊断路径。
 cover: /img/cover/deck-trilogy.jpg
 toc: true
 copyright: true
 ---
 
-想在 Steam Deck 上原生玩 Switch 游戏，不用模拟器、不靠运行时模拟，怎么做到？路线只有三条：模拟器（Ryujinx 这类，快但兼容性看天）、兼容层（转译，稳但每帧交税）、真·原生——AOT 移植，把 Switch 的 AArch64 代码静态重编译成本机 x86-64 原生码，慢但体验上限最高。这个项目押第三条：把三款游戏（异界锁链、战神 3 重制版、血源诅咒）的 PC 重编译项目搬上 Deck，做到厂商原生移植的标准层次。前 → 后：**从"能跑"到准原生（厂商移植水准），血源 30-60fps 可玩。**定位也先写清，防止口径漂移：**个人使用 + 自媒体 demo，不上传私有游戏资产**。目标定高，取舍才有判据；边界定死，"不做什么"才有判据。
+想在 Steam Deck 上原生玩 Switch 游戏，不用模拟器、不靠运行时模拟，怎么做到？路线只有三条：模拟器（Ryujinx 这类，快但兼容性看天）、兼容层（转译，稳但每帧交税）、真·原生——AOT 移植，把 Switch 的 AArch64 代码静态重编译成本机 x86-64 原生码，慢但体验上限最高。这个项目押第三条：把三款游戏（异界锁链 [Switch]、战神 3 Remastered [PS4]、血源诅咒 [PS4]）的 PC 重编译项目搬上 Deck，做到厂商原生移植的标准层次。前 → 后：**从"能跑"到准原生（厂商移植水准），血源 30-60fps 可玩。**定位也先写清，防止口径漂移：**个人使用 + 自媒体 demo，不上传私有游戏资产**。目标定高，取舍才有判据；边界定死，"不做什么"才有判据。
 
 ## 三堵墙：挡的是架构差，不是单点难度
 
@@ -30,7 +30,7 @@ Switch 是 AArch64 + Maxwell GPU + Horizon 系统服务（Switch 的系统服务
 | B：GPU 着色器 | Maxwell SASS 不是 Vulkan | SASS → SPIR-V（复用 Ryujinx 的转译器）→ Vulkan，跳过 Metal 那一步 |
 | C：系统服务 | Horizon 的服务调用（音频、输入、NFC） | 在宿主二进制里 HLE 重新实现，不搬 HOS 内核 |
 
-结论是这条路线**不需要 HOS 内核、不需要 Hypervisor、不需要 TrustZone**——早期调研里"HOS 上 x86 不可能"的判断被推翻，修正后才敢立项。三堵墙都有活跃的参考项目（ScarletNX、LAS Recomp、totk-recomp），本项目不是从零造轮子，做的是"把上游成果对齐到 Deck 的验收标准"。
+结论是这条路线**不需要 HOS 内核、不需要 Hypervisor、不需要 TrustZone**——早期调研里"HOS 上 x86 不可能"的判断被推翻，修正后才敢立项。三堵墙都有活跃的参考实现（ScarletNX 通用管线、LAS Recomp / totk-recomp 针对塞尔达系列），本项目不是从零造轮子，做的是"把上游成果对齐到 Deck 的验收标准"。
 
 AOT 构建侧的落法是"函数发现 → 逐函数 lift 成 C → 宿主 clang 编译"（非 QEMU、非动态翻译）：
 
@@ -49,7 +49,7 @@ GPU 墙的大头在对齐语义：Maxwell 与 Vulkan 的行为差逐条建表，
 
 三款游戏的上游成熟度差异很大，直接决定工作量分布：
 
-- **血源诅咒**（bbport）：上游最成熟，原生 x86-64 执行 + 自研 Vulkan 渲染器，Deck 上 30-60fps 可用，工作重心在验收和平台集成；
+- **血源诅咒**（bbport 0.7 experimental）：上游三款中最成熟，原生 x86-64 执行 + 自研 Vulkan 渲染器，Deck 上 30-60fps 可玩；0.7 为实验版，上游 issue 记录有 0.51→0.7 的性能退化，“可玩”不等于“无退化”，工作重心在验收和平台集成；
 - **异界锁链**（astral-chain-pc-recomp）：LLVM 静态重编译管线完整，但上游明说"尚未针对 4GB VRAM 和 Deck 优化"，这块要自己补；
 - **战神 3**（SpartanPort）：上游在 Deck/RADV 上有已知的渲染损坏，动手前先确认新版是否修掉，否则搬过去也是坏的。
 
@@ -74,14 +74,14 @@ ulimit -c 0
 unset TOTK_INPUT_FIFO TOTK_INPUT_SCRIPT TOTK_FS_LOG TOTK_AUDIO_CAPTURE TOTK_INPUT_AUDIT
 unset DM_NVN_TSV DM_NVN_TSV_CALLS DM_NVN_FRAMES DM_NVN_PROF DM_PRESENT_HZ DM_PRESENT_INTERVAL DM_DETCLOCK
 unset TOTK_HEADLESS TOTK_SHOT LARECOMP_FNPROF
-export XDG_DATA_HOME="$HOME/.local/share/ultratears/test-profiles/⟨test-profile⟩"
+export XDG_DATA_HOME="$HOME/.local/share/ultratears/test-profiles/⟨test-profile⟩"   # ultratears = 王国之泪 1.4.3 管线（前作，验收电池同用）
 export TOTK_GYRO=1
 export TOTK_LANG=zh-Hans TOTK_OPERATION_MODE=handheld TOTK_STEAMDECK_UI=1
 export TOTK_FPS60=1 TOTK_REALTIME=1 TOTK_UNCAPPED=1 TOTK_UNCAPPED_HZ=60 TOTK_UNCAPPED_INTERVAL=1
 export TOTK_CLOTH_REALTIME=1 TOTK_HIGHFPS_FIX=1 SDL_VIDEO_DRIVER=x11 SDL_VIDEODRIVER=x11
 export SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT="0x045e/0xc0de"
 export SDL_GAMECONTROLLERCONFIG_FILE=".../deck-experience-20261107/test-pad-mapping.txt"
-exec "/home/deck/native-recomp/totk-native/releases/⟨build-id⟩/run.sh"
+exec "/home/deck/native-recomp/totk-native/releases/⟨build-id⟩/run.sh"   # 前作 TOTK 构建；遥操现场取自该会话
 ```
 
 "继承上一个环境"是回归的最大来源，所以候选环境必须白名单式重建。手柄那行只认注入手柄、过滤 Deck 自带的，输入归因才干净。
@@ -151,13 +151,13 @@ SDL_SetWindowTitle(window, title);
 - **平台集成**：Steam 库条目、封面、控制器模板，做到游戏模式里"看起来就是个正常游戏"；
 - **中文化**：支持简中的上游直接用，不支持的按资产管线补，不硬改字符串表。
 
-## 成果：血源在 Deck 上 30-60fps 可用，三作共用一套验收标准
+## 成果：血源在 Deck 上 30-60fps 可玩（0.7 实验版），三作共用一套验收标准
 
-- 血源诅咒在 Deck 上 30-60fps 可用，三款里上游最成熟、验收直接落地的一款；
+- 血源诅咒（bbport 0.7 experimental）在 Deck 上 30-60fps 可玩，三款里上游最成熟、验收直接落地的一款；上游 issue 记录有 0.51→0.7 的性能退化，“可玩”不等于“无退化”；
 - 三作共用一套 63 条案例的验收标准，且标准本身被盲区审计过一轮；
 - deck-experience 受控会话跑通：内核级隔离 + 存档硬断言 + 全程留痕。
 
-前 → 后：三款游戏从"能在 Deck 上跑起来"，到按厂商移植水准逐项验收——准原生的观感层（按键提示、超分选型、平台集成、中文化）+ 可复现的验收电池，血源 30-60fps 可玩。
+前 → 后：三款游戏从"能在 Deck 上跑起来"，到按厂商移植水准逐项验收——准原生的观感层（按键提示、超分选型、平台集成、中文化）+ 可复现的验收电池，血源 30-60fps 可玩（0.7 experimental）。
 
 ## 未闭环清单
 
@@ -165,6 +165,7 @@ SDL_SetWindowTitle(window, title);
 | --- | --- |
 | 中文配音（三款全量） | 仅调研：格式管线（XVAG/Wwise/FSB5）与 TTS 许可、法律边界已确认，实施未授权 |
 | TOTK 60fps 解锁 | 未生效：窗口标题稳定 30.0 fps，帧时 p50 31.91ms |
+| 血源 bbport 0.7 → 正式版 | 等上游发布；issue 有 0.51→0.7 性能退化 |
 | 战神 3 RADV 渲染损坏 | 等上游修复后收口 |
 | hardware_validated | 三款均 false：代码合入、CI 绿、遥操会话跑通，都不等于"用户手里那台 Deck 上日常可玩" |
 
@@ -174,7 +175,7 @@ SDL_SetWindowTitle(window, title);
 
 只留一条经验：**验收读运行时数字，不读进程活着。**
 
-项目代码：总仓 [opsbsligm/nativedeck](https://github.com/opsbsligm/nativedeck)（证据链与验收纪律所在；战神 3 的 ultratears 移植落在 `ports/ultratears-linux`）。三款里唯一独立成仓的是异界锁链：[opsbsligm/astral-native](https://github.com/opsbsligm/astral-native)；血源走上游 bbport、以验收对齐为主，未单拆仓。
+项目代码：总仓 [opsbsligm/nativedeck](https://github.com/opsbsligm/nativedeck)——`ports/ultratears-linux` 为前作王国之泪 1.4.3 的 AOT 移植管线（验收电池同用），`ports/totk-recomp-linux` 为 TOTK 1.0.0 管线；前作塞尔达两作独立成仓：[opsbsligm/botw-native](https://github.com/opsbsligm/botw-native)（旷野之息）、[opsbsligm/totk-native](https://github.com/opsbsligm/totk-native)（王国之泪）。本三部曲中唯一独立成仓的是异界锁链：[opsbsligm/astral-native](https://github.com/opsbsligm/astral-native)（上游 captainj-sparrow/astral-chain-pc-recomp，本地固定 1.5.0）；战神 3 走上游 [SpartanPort](https://github.com/FelipePrado0/SpartanPort)（7289f72）、血源走上游 [bbport](https://github.com/BBPort/bbport)（0.7 experimental），均尚未拆仓。
 
 ---
 

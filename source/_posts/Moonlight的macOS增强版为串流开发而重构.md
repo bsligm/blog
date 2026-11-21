@@ -180,6 +180,8 @@ bash "${SCRIPT_DIR}/codesign-bundle.sh" "$STAGING_DIR/$APP_NAME.app"
 
 只留一条经验：**增强型 fork 先定对标清单，`hardware_validated` 按机型口径写，CI 全绿不等于多机型可用。**
 
+项目代码：[opsbsligm/moonlight-macos-enhanced](https://github.com/opsbsligm/moonlight-macos-enhanced)。
+
 ---
 
 版本号、CI 时长与 runner 配置取自当时现场记录；未覆盖的机型行为以验收后口径为准。

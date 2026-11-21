@@ -154,6 +154,8 @@ P100 直通和这个 App 都没有高难动作。真正花时间是文档不写�
 
 只留一条经验：**NAS 上跑推理，先定义"完成"——分片 SHA 检查点 + 成品实际解码两层都过，不是任务状态位。**
 
+项目代码：[opsbsligm/fnos-video-enhance](https://github.com/opsbsligm/fnos-video-enhance)。
+
 ---
 
 卡型号、显存数字与 App 版本号取自当时现场记录；DDA 行为未经飞牛大升级后二次复测，仅作口径参考。

@@ -174,6 +174,8 @@ SDL_SetWindowTitle(window, title);
 
 只留一条经验：**验收读运行时数字，不读进程活着。**
 
+项目代码：总仓 [opsbsligm/nativedeck](https://github.com/opsbsligm/nativedeck)（证据链与验收纪律所在），两款游戏移植仓 [opsbsligm/totk-native](https://github.com/opsbsligm/totk-native)、[opsbsligm/astral-native](https://github.com/opsbsligm/astral-native)。
+
 ---
 
 游戏名为专有名词保留；内网节点名、IP 与凭据引用均已脱敏；帧率与帧时取自当时遥操会话的现场记录，仅作口径参考。

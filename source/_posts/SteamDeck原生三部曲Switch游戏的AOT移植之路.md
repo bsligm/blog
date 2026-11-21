@@ -174,7 +174,7 @@ SDL_SetWindowTitle(window, title);
 
 只留一条经验：**验收读运行时数字，不读进程活着。**
 
-项目代码：总仓 [opsbsligm/nativedeck](https://github.com/opsbsligm/nativedeck)（证据链与验收纪律所在），两款游戏移植仓 [opsbsligm/totk-native](https://github.com/opsbsligm/totk-native)、[opsbsligm/astral-native](https://github.com/opsbsligm/astral-native)。
+项目代码：总仓 [opsbsligm/nativedeck](https://github.com/opsbsligm/nativedeck)（证据链与验收纪律所在；战神 3 的 ultratears 移植落在 `ports/ultratears-linux`）。三款里唯一独立成仓的是异界锁链：[opsbsligm/astral-native](https://github.com/opsbsligm/astral-native)；血源走上游 bbport、以验收对齐为主，未单拆仓。
 
 ---
 

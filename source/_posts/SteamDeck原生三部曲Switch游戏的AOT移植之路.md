@@ -175,7 +175,7 @@ SDL_SetWindowTitle(window, title);
 
 只留一条经验：**验收读运行时数字，不读进程活着。**
 
-项目代码：总仓 [opsbsligm/nativedeck](https://github.com/opsbsligm/nativedeck)——`ports/ultratears-linux` 为前作王国之泪 1.4.3 的 AOT 移植管线（验收电池同用），`ports/totk-recomp-linux` 为 TOTK 1.0.0 管线；前作塞尔达两作独立成仓：[opsbsligm/botw-native](https://github.com/opsbsligm/botw-native)（旷野之息）、[opsbsligm/totk-native](https://github.com/opsbsligm/totk-native)（王国之泪）。本三部曲中唯一独立成仓的是异界锁链：[opsbsligm/astral-native](https://github.com/opsbsligm/astral-native)（上游 captainj-sparrow/astral-chain-pc-recomp，本地固定 1.5.0）；战神 3 走上游 [SpartanPort](https://github.com/FelipePrado0/SpartanPort)（7289f72）、血源走上游 [bbport](https://github.com/BBPort/bbport)（0.7 experimental），均尚未拆仓。
+项目代码：总仓 [opsbsligm/nativedeck](https://github.com/opsbsligm/nativedeck)——`ports/ultratears-linux` 为前作王国之泪 1.4.3 的 AOT 移植管线（验收电池同用），`ports/totk-recomp-linux` 为 TOTK 1.0.0 管线；前作塞尔达两作独立成仓：[opsbsligm/botw-native](https://github.com/opsbsligm/botw-native)（旷野之息）、[opsbsligm/totk-native](https://github.com/opsbsligm/totk-native)（王国之泪）。本三部曲中唯一独立成仓的是异界锁链：[opsbsligm/astral-native](https://github.com/opsbsligm/astral-native)（上游 captainj-sparrow/astral-chain-pc-recomp，本地固定 1.5.0）；战神 3 走上游 [SpartanPort](https://github.com/FelipePrado0/SpartanPort)（7289f72）、血源走上游 [bbport](https://github.com/deadinside28/bloodborne_pc)（0.7 experimental），均尚未拆仓。
 
 ---
 

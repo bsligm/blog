@@ -1,7 +1,7 @@
 ---
 title: Home Assistant 运维实录：实体状态、HAOS 升级和备份怎么验
 date: 2026-10-03 22:00:00
-updated: 2026-11-23 18:37:00
+updated: 2026-11-23 22:35:00
 tags:
   - Home Assistant
   - HAOS
@@ -53,5 +53,13 @@ HAOS 和 Home Assistant Core 分别更新。HAOS 支持从界面或 CLI 更新�
 最后我留下了三类可以接着用的检查：从实体告警追到容器证据，按占用来源归因磁盘水位，升级时保留前后版本和应用状态。这里真正增加的一道工序是验证新上报，尤其是状态原本就长期不变的实体，单看界面那个值很容易读到旧数据。要选会出新事件的对象，或者单独做受控验证。
 
 归档结构读回通过是这一轮的最后一项备份证据。升级仍由人工确认，升级失败后的恢复演练还没有完成；如果要进一步放开自动升级，先补一个能实际装回配置、验证关键实体再上报的独立恢复环境。
+
+公开材料里也没有一条带时间戳的实体恢复原始记录。留下这类时间线时，我会用同一个脱敏实体代号，把下面三项对齐到同一时区，再判断它缺了哪层证据。尤其最后一项要等到处置之后的新消息，旧状态还能读到并不满足条件。
+
+| 顺序 | 该记哪条证据 |
+| --- | --- |
+| 应用侧发现异常 | 第一次读到不可用的时间、最后一次有效上报时间 |
+| 系统侧定位 | 相关进程的状态变更时间、退出状态和同一时窗的日志 |
+| 回到应用侧验证 | 新上报的时间和有效状态，连同本次操作完成时间 |
 
 文档：[HAOS 升级](https://www.home-assistant.io/common-tasks/os/#updating-the-home-assistant-operating-system)、[备份与恢复](https://www.home-assistant.io/common-tasks/general/backups/)、[OpenSSH scp 手册](https://man.openbsd.org/scp)、[Docker 容器退出状态](https://docs.docker.com/reference/cli/docker/container/ls/)。

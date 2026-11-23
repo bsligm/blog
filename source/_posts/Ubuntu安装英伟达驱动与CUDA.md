@@ -1,22 +1,22 @@
 ---
 title: Ubuntu 安装英伟达驱动与 CUDA
 date: 2023-11-09 11:40:00
-updated: 2026-11-20 12:00:00
+updated: 2026-11-23 22:35:00
 tags:
   - Ubuntu
   - Linux
 categories:
   - 系统运维
 keywords: Ubuntu, 英伟达驱动, CUDA, runfile 安装, DKMS, nouveau, Secure Boot
-description: Ubuntu 用 runfile 装 NVIDIA 专有驱动与 CUDA 工具包：驱动决定 CUDA 上限、安装器三处取舍、nouveau 屏蔽、Secure Boot、环境变量与多版本共存坑，外加开源内核模块与版本兼容矩阵等关键决策。
+description: 2023 年 Ubuntu 通过 runfile 安装 NVIDIA 驱动与 CUDA Toolkit 的记录，补充驱动与 CUDA 运行时兼容、安装渠道取舍和最小算例验收。
 cover: /img/cover/cuda-driver.jpg
 toc: true
 copyright: true
 ---
 
-计算与存储主题的三篇老文是算力层的起点，这篇是最底层的一篇：先装专有驱动（决定可用的最高 CUDA 版本），再装 CUDA 工具包（编译器与运行库）。后来的 DGX Spark 部署、PVE GPU 切分、vLLM 环境，全部落回这两步。当时没展开的点——驱动版本怎么选、驱动与 CUDA 的兼容矩阵、ECC、nvidia-persistenced——正是后面踩坑最多的地方。
+这是 2023 年用独立安装包部署 NVIDIA 驱动与 CUDA Toolkit 的记录。驱动负责设备和内核接口，Toolkit 提供编译器、开发工具与库。服务进程还可能从容器或框架发行包加载运行时，所以三者要分别定位。
 
-这篇覆盖 runfile 安装全过程与常见失败排查；操作会改内核模块和系统级配置，建议先在测试机验证。
+当时用 runfile 是为了固定版本。复用这份经验时，先按目标 GPU、发行版、内核和负载核对支持范围，再选镜像、包管理器或 runfile。后来的 [DGX Spark 推理环境](/2026/11/19/DGX-Spark-vLLM部署与多Agent接入/) 与 [PVE GPU 虚拟化](/2026/11/19/PVE双宿主机与GPU切分实录/) 还要核对容器架构或宿主与来宾驱动，不能直接套这里的命令。
 
 ## 准备
 
@@ -70,7 +70,7 @@ nvidia-smi
 
 ## 安装 CUDA 工具包
 
-先看 `nvidia-smi` 右上角的 `CUDA Version`——这是**驱动支持的上限**，装的工具包版本不能高于它：
+先用 `nvidia-smi` 读驱动版本，再按要运行的 CUDA 应用或框架查最低驱动要求。界面上的 `CUDA Version` 是驱动报告的支持版本，不代表已装 Toolkit，也不能替代 [NVIDIA 的次版本兼容规则](https://docs.nvidia.com/deploy/cuda-compatibility/latest/minor-version-compatibility.html)。
 
 ![CUDA 版本兼容性检查](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202311091241712.png "CUDA版本兼容性检查")
 
@@ -128,13 +128,13 @@ nvcc -V
 
 ## 关键设计决策
 
-**为什么用 runfile 而不是 apt 包。** apt 路线（`nvidia-driver-*`）版本滞后且不可选版本；runfile 现场编译内核模块，能精确指定版本。代价是内核升级要重编译——这就是安装器里 DKMS 必须选 Yes 的原因，否则就得锁内核。
+**安装渠道。** 当时为了锁定指定版本，选的是 runfile。发行版软件仓库提供的分支、版本和内核适配要按当前发行版核对。选定一种管理方式后，尽量在同一渠道升级和卸载。内核更新前核对目标内核的模块构建与签名，支持 DKMS 的组合也要在重启后读回实际模块状态。
 
 **专有驱动 vs 开源内核模块。** 2023 年对当时的卡，专有驱动是稳妥选择。这个选项在新一代架构上变成关键项：部分新特性要求开源内核模块（`-m=kernel-open`），Blackwell 系卡在 PVE 上的实测也全部建立在开源模块上——后面 GPU 切分篇的黑名单 `nouveau` 报 `unknown chipset` 就是这个背景。
 
 **nouveau 为什么必须禁。** nouveau 与专有驱动争抢同一块 GPU，modeset 冲突会让安装器直接失败。屏蔽只处理模块加载，和"卸载 NVIDIA 驱动"是两件事。
 
-**版本兼容矩阵怎么查。** 硬约束只有一条：工具包版本 ≤ `nvidia-smi` 显示的 `CUDA Version`——那是驱动支持的上限，不是已装的工具包版本。反查方向从 CUDA 版本找对应驱动，用 CUDA Toolkit Release Notes / 驱动 release notes，别凭记忆。
+**版本兼容怎么查。** 先用目标 Toolkit 或应用版本定位官方兼容表，再核对驱动、架构和功能限制。CUDA 11 起，同一主版本内存在带限制的次版本兼容。依赖新驱动功能或 PTX 即时编译的应用需要单独验证，不能看到版本数字接近就签字。
 
 ## 常见问题
 
@@ -142,7 +142,7 @@ nvcc -V
 
 两类常见原因：
 
-- **Secure Boot 启用**：未签名的内核模块被拒绝加载。BIOS 里禁用 Secure Boot，或按安装器提示登记 MOK（Machine Owner Key）后重启完成签名。
+- **Secure Boot 启用**：未签名或签名不受信的模块可能被拒绝。按组织基线使用发行版支持的签名模块或受控的 MOK 签名与登记流程，重启后核对模块确实加载。
 - **nouveau 冲突**：开源 nouveau 与专有驱动不能共存，先屏蔽 nouveau。
 
 屏蔽 nouveau（注意与"卸载 NVIDIA 专有驱动"是两件事，此处只要前者）：
@@ -168,7 +168,7 @@ mokutil --sb-state     # 确认 Secure Boot 状态
 
 ### 2. CUDA 版本不匹配
 
-`nvidia-smi` 的 `CUDA Version` 是驱动支持的最高版本，工具包装得比它高就运行时不可用。要么升驱动，要么降 CUDA。
+先对照兼容矩阵、应用实际加载的运行时以及首次失败的错误，再决定调整驱动或运行时。容器里的 CUDA 库版本与宿主 `nvcc -V` 可能不同，两边都要读回。
 
 ### 3. 安装后 `nvcc` 找不到
 
@@ -176,9 +176,8 @@ mokutil --sb-state     # 确认 Secure Boot 状态
 
 ## 总结
 
-两条验收线：`nvidia-smi` 正常出表（驱动能加载），`nvcc -V` 能出版本（工具包可用），都过了环境才算可用。
+我把验收分三层：`nvidia-smi` 用来读设备与驱动，`nvcc -V` 用来定位实际调用的编译器，最后在目标用户和运行环境下跑最小 CUDA 算例。前两层通过也可能在第三层遇到动态库或容器设备透传错误。本文保留的是安装与版本检查过程，未附原始算例结果。
 
-- **版本硬约束只有一个**：CUDA 工具包版本 ≤ `nvidia-smi` 报的 `CUDA Version`。那项是驱动支持的上限，不是已装版本——先装高版本 CUDA 再回头升驱动，比反过来代价大。
 - **内核升级会让 `.run` 装的驱动失联**，模块要重编译。生产机锁内核小版本，或改用 DKMS / 发行版仓库的 `nvidia-driver-*` 包。
 - **`CUDA_HOME` 别写死版本号**：多版本共存时 `/usr/local/cuda` 符号链接才是切换开关，写死 `cuda-12.2` 会让切版本变成改 `.bashrc`。
 - **临时环境不继承变量**：`sudo -i`、cron、systemd 服务、CI runner 都不读 `~/.bashrc`，脚本里显式用绝对路径或走 `/etc/profile.d/`。

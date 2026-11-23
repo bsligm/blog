@@ -1,7 +1,7 @@
 ---
 title: Homelab 巡检实录：管理接口返回 403，服务状态又为什么看不出故障
 date: 2026-10-05 20:00:00
-updated: 2026-11-23 18:37:00
+updated: 2026-11-23 22:35:00
 tags:
   - AI Agent
   - SafeLine
@@ -55,5 +55,7 @@ system_observation: database and monitoring jobs waiting
 repeat_result: api responded after queue unblocked
 separate_check: recent metrics still need verification
 ```
+
+以后遇到同样的故障，我会从受影响的主机选一个固定间隔采集的监控项，记下恢复操作前最后一个样本时间，等一个完整采集周期加预留延迟，再查历史里是否出现晚于处置结束的新样本。如果看到了新数据，还要确认值符合预期且监控项没有进入不支持状态。若没有新样本，沿采集器、队列和入库状态往下查。原笔记可以证实版本请求恢复，没有可对账的采集样本，因此不能把约 67 分钟写成监控数据也恢复的用时。
 
 同一表格用到 GitLab 或知识库时，探活字段仍然便宜，深查字段则换成对应服务能回答的那一个问题。读取得到权限拒绝就按拒绝记录，写操作涉及权限或公网入口则走人工审批。这样巡检不用携带一份能管理所有服务的凭据，也不会把一条绿色 API 结果误抄成整项服务健康。

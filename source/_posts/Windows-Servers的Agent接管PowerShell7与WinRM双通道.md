@@ -1,7 +1,7 @@
 ---
 title: Windows Server 远程运维实录：WinRM 主用，SSH 应对维护窗口
 date: 2026-10-01 21:00:00
-updated: 2026-11-23 18:37:00
+updated: 2026-11-23 22:35:00
 tags:
   - Windows Server
   - PowerShell
@@ -48,6 +48,18 @@ WinRM 是远程管理通道。客户端常用的 `run_ps` 会调用 Windows Powe
 | 主通道在执行前连不上 | 独立确认备选通道，记录实际使用的路径 |
 
 这也解决了降级重试的一类风险。若请求已经发出但回包超时，先检查目标状态和任务记录，再决定是否重试。只有确认主通道在执行前不可用，才切到 SSH 跑同样的操作。
+
+以只读清点虚拟机为例，我倾向让调用端记下下面这些字段。值是检查项示意，未引用实际主机和执行结果。一个容易漏掉的情况是返回了可解析的空列表。脚本层可以成功退出，清点仍需按任务预期判断是否读到了需要的对象。
+
+```yaml
+task: vm_inventory
+operation: read_only
+channel: record_actual_transport
+engine_version: read_from_remote_session
+exit_code: record_remote_exit_status
+response_check: parse_inventory_and_compare_expected_scope
+final_status: evaluate_exit_code_and_response_together
+```
 
 ## SSH 实际顶住了哪一次
 

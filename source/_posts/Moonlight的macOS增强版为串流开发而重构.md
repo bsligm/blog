@@ -1,7 +1,7 @@
 ---
 title: 为串流开发重构 Moonlight：macOS 增强版的八周记录
 date: 2026-10-19 21:00:00
-updated: 2026-11-23 17:30:00
+updated: 2026-11-23 18:25:00
 tags:
   - Moonlight
   - 串流
@@ -19,6 +19,8 @@ copyright: true
 ---
 
 我在 Mac 上调试游戏串流。有些参数改一次就得翻一次 plist，设备偶尔掉线时，列表还会留着上一轮的结果。手工改配置能解决一次问题，第二天换设备重测又得从头核对。我保留台式机端的 Sunshine 服务，花了八周改 Moonlight macOS 客户端，先把常调的参数搬进设置页，再加上能回看的设备和会话诊断。
+
+Sunshine 在台式机上捕获和编码画面，Mac 上的 Moonlight 接收、解码并显示，再把键盘和手柄输入送回去。改客户端设置时，得分清哪些选项会在开始串流时与主机协商，哪些只会改变 Mac 本机的显示或输入行为。比如提高客户端的目标帧率，需要主机实际按相应速率出帧，Mac 本地的设备列表则由 macOS 枚举。
 
 ## 先改每天都要用的地方
 
@@ -57,7 +59,7 @@ private func scanBus() {
 }
 ```
 
-每次刷新给"这一轮"盖一个 generation 编号，后台线程回主线程时再核编号——扫描期间切走又切回，旧结果丢弃并立即补扫，防"拔了设备列表还在"。断连回收不靠事件回调，靠"快照里没出现 = 这一轮的行不再生成"；规则按 VID/PID 允许清单每次对全新快照重算，重连时同一设备回到同一规则，不串。
+这里的 generation 是页面当前这轮扫描的编号。设想第一次扫描后台还在跑，用户拔了设备、切到别页又切回来。第一次扫描晚到的结果如果直接覆盖界面，就会把旧设备重新画回来。主线程回调先核对页面状态和编号，过期结果丢弃。页面仍可见时再补扫，让界面从新的总线快照生成。VID/PID 代表厂商和产品类型，可用于匹配规则，同型号设备的唯一身份还得看单独的标识。实际实现见 [设备页扫描](https://github.com/opsbsligm/moonlight-macos-enhanced/blob/cc6aa76f1459/Limelight/macOS/ViewControllers/SettingsDevicesPane.swift#L639)。
 
 ## 持久化配置和界面顺序分开
 
@@ -127,6 +129,10 @@ BUILD_NUM=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_PATH/Conte
 ```
 
 ## 实机记录
+
+串流流畅度容易被平均帧率掩盖。我给现场记录保留了每个采样窗口的 `fps` 和 `frameP95`。后者是该窗口的帧时间第 95 百分位，用来看较慢的一端。原生路径日志有 148 条记录，窗口帧率中位数是 31.88，对应的帧时间 P95 中位数为 44.444 ms。仅缩放的一组有 139 条，分别是 62.63 和 27.777 ms。这里取的是各采样窗口数值的中位数，未把原始帧并在一起重新计算分位数。
+
+两组帧率基线已经不同，记录可以帮助找到值得继续追的路径，无法单凭这组数字把差异归给缩放功能。要继续定位，应固定主机输出和客户端刷新率，逐次只改一个设置，再一起核对帧时间和提交等待。 [原生路径记录](https://github.com/opsbsligm/moonlight-macos-enhanced/blob/cc6aa76f1459/docs/evidence/frame-time-2026-10-15/group-native.log) · [仅缩放记录](https://github.com/opsbsligm/moonlight-macos-enhanced/blob/cc6aa76f1459/docs/evidence/frame-time-2026-10-15/group-scaling-only.log)
 
 八周后，我在自己的 Mac 上日常串流时，已经能从设置页调整常用参数，断连后回看会话摘要，排查设备时也能刷新本机 USB 列表。USB 重定向的端到端测试没有完成，公开 README 将它列为冻结项。第二台不同芯片代际的 Mac 也未进行同样的验收。
 

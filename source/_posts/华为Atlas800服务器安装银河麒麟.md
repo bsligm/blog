@@ -1,5 +1,5 @@
 ---
-title: 华为 Atlas800 服务器安装银河麒麟
+title: "给 Atlas 800 装银河麒麟，驱动和 CANN 得配哪一版"
 date: 2023-08-07 16:00:00
 updated: 2026-11-23 22:35:00
 tags:
@@ -11,13 +11,13 @@ categories:
   - 基础设施
   - 服务器管理
 keywords: Atlas800, 银河麒麟, iBMC, NPU 驱动, CANN, aarch64
-description: 2023 年 Atlas 800 训练服务器首次安装记录，含 iBMC 带外装机、银河麒麟与昇腾驱动、固件、CANN 的兼容核对和分层验收。
+description: "2023 年从 iBMC 挂镜像开始装一台昇腾服务器，按兼容表挑系统、固件、驱动和工具链。"
 cover: /img/cover/atlas-kylin.jpg
 toc: true
 copyright: true
 ---
 
-这是 2023 年一台 Atlas 800 训练服务器的首次装机记录。机器搭载 Ascend 910，宿主是 aarch64，操作系统选银河麒麟。我的工作是从 iBMC 带外装机开始，把内核、驱动、固件和 CANN 按同一套兼容表对齐，交付给后续使用这台机器的人。
+2023 年给一台 Atlas 800 首次装机。Ascend 910 在 aarch64 宿主上，系统用银河麒麟。我从 iBMC 挂镜像开始，装系统之前就先翻了兼容表，内核、驱动、固件和 CANN 得能配成一套。
 
 Atlas 800 有训练和推理等不同型号，不能只凭系列名下载软件包。动手前要确认完整机型、NPU 型号、OS 与内核、驱动和固件包、CANN 及所需框架版本。下文顺序限定于当时首次安装。已装设备的覆盖安装和升级要另看目标版本发布说明，例如 [昇腾安装指南](https://www.hiascend.com/doc_center/source/zh/canncommercial/70RC1/envdeployment/instg/instg_0019.html) 对部分设备区分首次安装的驱动优先与覆盖安装的固件优先。
 
@@ -172,7 +172,7 @@ sudo reboot
 
 **分步骤记录生效状态。** 首次安装按当次版本要求分别检查驱动、固件与重启后的状态。覆盖安装或升级切换到对应流程，不沿用本文的重启次数。
 
-**验证分三层，每层对应不同故障面。** `npu-smi info` 只证明驱动与固件加载成功；工具链 `set_env.sh` 加载后目录非空只证明 CANN 落盘完整；官方算例做最小执行验证，目标模型单独验收。
+设备、工具链和程序各查一次。`npu-smi info` 用来看设备与驱动。加载 `set_env.sh` 后查 CANN 工具链的位置。官方算例跑过了，再拿目标模型另测。
 
 ## 总结
 

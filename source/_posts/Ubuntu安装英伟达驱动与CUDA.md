@@ -1,5 +1,5 @@
 ---
-title: Ubuntu 安装英伟达驱动与 CUDA
+title: "Ubuntu 装好 NVIDIA 驱动后，怎么确认 CUDA 用的是哪一套"
 date: 2023-11-09 11:40:00
 updated: 2026-11-23 22:35:00
 tags:
@@ -8,13 +8,13 @@ tags:
 categories:
   - 系统运维
 keywords: Ubuntu, 英伟达驱动, CUDA, runfile 安装, DKMS, nouveau, Secure Boot
-description: 2023 年 Ubuntu 通过 runfile 安装 NVIDIA 驱动与 CUDA Toolkit 的记录，补充驱动与 CUDA 运行时兼容、安装渠道取舍和最小算例验收。
+description: "2023 年用 runfile 装驱动和 CUDA Toolkit 的记录。设备、编译器和程序实际加载的运行库，要各看一次。"
 cover: /img/cover/cuda-driver.jpg
 toc: true
 copyright: true
 ---
 
-这是 2023 年用独立安装包部署 NVIDIA 驱动与 CUDA Toolkit 的记录。驱动负责设备和内核接口，Toolkit 提供编译器、开发工具与库。服务进程还可能从容器或框架发行包加载运行时，所以三者要分别定位。
+2023 年我用独立安装包在 Ubuntu 上装 NVIDIA 驱动和 CUDA Toolkit。先把显卡认出来，再看 `nvcc` 指到哪。应用要是跑在容器里，还得进容器看看实际加载了哪一套运行库。把三处的版本记下来，算例报错时就知道该去找哪一层。
 
 当时用 runfile 是为了固定版本。复用这份经验时，先按目标 GPU、发行版、内核和负载核对支持范围，再选镜像、包管理器或 runfile。后来的 [DGX Spark 推理环境](/2026/11/19/DGX-Spark-vLLM部署与多Agent接入/) 与 [PVE GPU 虚拟化](/2026/11/19/PVE双宿主机与GPU切分实录/) 还要核对容器架构或宿主与来宾驱动，不能直接套这里的命令。
 
@@ -176,7 +176,7 @@ mokutil --sb-state     # 确认 Secure Boot 状态
 
 ## 总结
 
-我把验收分三层：`nvidia-smi` 用来读设备与驱动，`nvcc -V` 用来定位实际调用的编译器，最后在目标用户和运行环境下跑最小 CUDA 算例。前两层通过也可能在第三层遇到动态库或容器设备透传错误。本文保留的是安装与版本检查过程，未附原始算例结果。
+我在宿主先用 `nvidia-smi` 看设备和驱动，再用 `nvcc -V` 看现在叫到哪个编译器。最后一步要换到程序真正运行的用户和环境里跑 CUDA 算例，容器看不到设备或加载错库，往往到这一步才报错。原笔记留了安装和查版本的过程，没留算例输出。
 
 - **内核升级会让 `.run` 装的驱动失联**，模块要重编译。生产机锁内核小版本，或改用 DKMS / 发行版仓库的 `nvidia-driver-*` 包。
 - **`CUDA_HOME` 别写死版本号**：多版本共存时 `/usr/local/cuda` 符号链接才是切换开关，写死 `cuda-12.2` 会让切版本变成改 `.bashrc`。

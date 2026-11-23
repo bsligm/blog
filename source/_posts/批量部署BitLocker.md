@@ -1,5 +1,5 @@
 ---
-title: Windows域环境下批量部署BitLocker
+title: "给一批办公机开 BitLocker，先确认出事能解锁"
 date: 2023-02-22 11:00:00
 updated: 2026-11-23 22:35:00
 tags:
@@ -11,13 +11,13 @@ categories:
   - 基础设施
   - 安全管理
 keywords: BitLocker, 批量部署, AD域, 组策略, TPM 2.0, 恢复密钥
-description: 2023 年 Windows 域内 BitLocker 批量部署复盘。记录测试 OU 灰度、加密状态与保护状态的区别、AD DS 托管恢复信息和恢复演练。
+description: "2023 年用测试 OU 推 BitLocker。加密进度、保护状态和目录里那条恢复信息，各查各的。"
 cover: /img/cover/bitlocker.jpg
 toc: true
 copyright: true
 ---
 
-这篇记的是 2023 年用域策略对办公机批量部署 BitLocker 的过程。当时想把两件事从手工操作里拿掉：按设备组统一启用系统盘加密，以及在设备进入恢复状态时能从目录定位对应的恢复信息。[域控安装记录](/2021/05/06/AD搭建/)交代了这套身份与策略底座。
+2023 年给办公机批量开 BitLocker，我想省掉逐台配置，还得保证电脑进了恢复状态时，能在目录里找到对应的恢复信息。先把几台机器放进测试 OU，再看批量策略能走到哪。早一点的{% post_link AD搭建 "域控安装笔记" %}写的是这套目录怎么搭起来的。
 
 > **版本说明**：文中保留当时的部署选择和已经暴露的问题。新的部署以 [Microsoft BitLocker 策略文档](https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/configure) 和现有设备管理平台为准。
 
@@ -67,4 +67,4 @@ Get-BitLockerVolume -MountPoint $env:SystemDrive |
 | 转换 | 系统盘转换和保护状态都符合预期，有异常时可阻止扩大批次 |
 | 恢复演练 | 在批准的测试设备上实际解锁，留时间、验证结果和异常，不记恢复密码 |
 
-历史记录保留了批量部署和目录托管的做法，原文没有可回查的测试设备解锁记录，这一步保留为验收门槛。加密和解密都需要时间。若设备进入恢复状态，先完成身份、设备和工单核对，再由有权限的人处理恢复。
+原笔记能看到策略怎么推、恢复信息怎么进目录，没找到一台测试机实际解锁的记录。下一批真要放开之前，我会先找受控设备过一遍。在工单上核身份和设备，由获授权的人取用恢复信息，最后只留解锁结果。

@@ -1,5 +1,5 @@
 ---
-title: Steam Deck 兼容性研究：三作适配路线与一套实机验收方法
+title: "Steam Deck 上看三款主机游戏的适配路线"
 date: 2026-11-06 21:00:00
 updated: 2026-11-23 22:35:00
 tags:
@@ -12,13 +12,13 @@ categories:
   - 桌面维护
   - 系统维护
 keywords: Steam Deck, Switch, AOT 重编译, LLVM, SPIR-V, Vulkan, Horizon, 异界锁链, 战神3, 血源诅咒, RADV, 遥操测试
-description: "在 Steam Deck 上评估异界锁链、战神 3 Remastered 与血源诅咒的移植路线，并用王国之泪的独立测试说明存档隔离和帧率诊断。"
+description: "异界锁链和两款 PS4 游戏的适配路线不同。文中的独立实机样本来自王国之泪，用来演示怎样看存档和帧时。"
 cover: /img/cover/deck-trilogy.jpg
 toc: true
 copyright: true
 ---
 
-想把几款主机游戏搬到 Steam Deck，最先碰到的区别在 CPU。异界锁链的 Switch 版用 AArch64，Deck 用 x86-64。战神 3 Remastered 和血源诅咒的 PS4 版都是 x86-64，CPU 架构相同，图形接口和系统服务仍要适配。我把三款放在一起做的是路线调研和验收设计。有自己提交的异界锁链适配，也有只记录上游和待复测问题的两款 PS4 项目。
+这三款游戏放在一起看，头一个分岔是 CPU。异界锁链在 Switch 上跑 AArch64，Steam Deck 是 x86-64。战神 3 Remastered 和血源诅咒的 PS4 版已经是 x86-64，仍然要面对图形接口和系统服务。我做过异界锁链的部分适配，另外两作主要查了上游进度，记下还有哪些场景要上 Deck 复测。
 
 这次最想回答的是项目能不能被别人接手验证。上游说能跑、我把工程接到 Linux、某个场景在 Deck 上过了，三件事要各自留证。我的主要工作是建立前两者之间的适配入口，再把后两者之间的间隔缩短。每个测试要能说出用什么构建、进了哪个场景、动了哪些设定、退出后数据是否还完整。否则一次成功只对当时打开那扇窗口的人有说服力。
 
@@ -80,11 +80,11 @@ AOT（提前编译）在这里指 Switch 游戏的 CPU 代码在构建时重编�
 | 主菜单帧率稳定 | 固定游戏场景再看帧时间和坏帧 | 窗口、场景、版本和采样区间都有记录 |
 | 游戏退出后存档还能读 | 独立检查原始样本和本轮测试副本 | 原样本清单可完整对账，测试副本变化有预期 |
 
-这张表是跨作品可复用的验收方式。本文能拿来复核的 Deck 运行样本来自王国之泪，三款调研项目各自仍需真实的游戏模式、场景和长时间验收。
+上面的实机数字来自王国之泪。要换到另外三款，先给各自留好测试存档，再把场景、游戏逻辑和长时间帧时重新记一遍。
 
 ## 项目索引
 
 - [NativeDeck](https://github.com/opsbsligm/nativedeck) 收录工具和研究记录。独立适配项目有 [异界锁链](https://github.com/opsbsligm/astral-native)、前作 [旷野之息](https://github.com/opsbsligm/botw-native) 和 [王国之泪](https://github.com/opsbsligm/totk-native)。
 - 两款 PS4 游戏的入口是上游 [SpartanPort](https://github.com/FelipePrado0/SpartanPort) 和 [bbport](https://github.com/deadinside28/bloodborne_pc)。版本状态、已知问题与安装条件以各项目自己的说明为准。
 
-这些链接供读者查阅工程与测试方法。部分第三方材料的再分发授权尚未核实，引用或再分发前应单独核对权利来源。
+仓库里的工程和测试方法可以顺着链接查。用了哪些第三方材料、能不能再分发，按每项内容的权利来源单独核实。

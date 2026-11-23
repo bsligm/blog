@@ -1,5 +1,5 @@
 ---
-title: Edge 报网页兼容错误的历史复盘：从渲染器崩溃到定向恢复
+title: "Edge 能打开，为什么每个网页都报错"
 date: 2021-05-04 13:50:12
 updated: 2026-11-23 22:35:00
 tags:
@@ -10,7 +10,7 @@ categories:
   - 桌面维护
   - 系统运维
 keywords: Edge浏览器, 渲染器代码完整性, RendererCodeIntegrityEnabled, 注册表, 组策略, 企业部署
-description: 旧版 Edge 批量故障复盘，记录如何区分页面兼容与进程崩溃、限定影响范围、验证业务恢复，并注明旧策略失效范围。
+description: "2021 年的一次 Edge 故障。从换站点和换终端开始查，旧的渲染器代码完整性策略到 Edge 119 已不再适用。"
 cover: /img/cover/edge-compat.jpg
 toc: true
 copyright: true
@@ -18,7 +18,7 @@ copyright: true
 
 > **版本说明**：这是 2021 年的故障记录。当时的渲染器代码完整性策略在 Edge 118 之后已经失效。现代环境先收集崩溃证据，按浏览器和相关终端软件的受支持版本查修复路径。[微软 Edge 策略说明](https://learn.microsoft.com/en-us/deployedge/microsoft-edge-policies/renderercodeintegrityenabled)
 
-这次报障看着像页面兼容问题，用户说某个地址打不开。换几个独立站点再试，才知道任意页面都失败。浏览器的外壳能打开，承载页面的渲染进程却没工作，这两条状态把排查方向从业务站点挪到了终端。
+最初报过来的是一个网址打不开。我在同一台电脑上换了几个互不相干的站点，也都不行。浏览器窗口还在，网页却渲染不出来。查到这里，才把注意力从那个网站转回终端。
 
 ![Edge浏览器兼容性问题报错](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202509081511061.jpg)
 
@@ -43,4 +43,4 @@ copyright: true
 
 发布与生效之间容易多走一步。管理控制台显示策略下发，只说明提交发生。对照机上用 `edge://version`、`edge://policy` 核版本和生效状态，再走原业务路径。这比把浏览器能启动写成整批恢复更可核对。[微软 Edge 策略管理说明](https://learn.microsoft.com/en-us/deployedge/configure-microsoft-edge)
 
-旧现场没留足提取模块根因所需的完整崩溃记录，适合回顾的是定向试点和可撤回的变更。后来做企业域策略时，我也保留了这种验收安排。{% post_link 三台域控部署实录 "跨站点域控与策略验收" %}
+那次没有留足崩溃记录，现在追不到具体模块。后来做域策略时，我还在用当时的办法：拿小批设备试，把撤回条件写好，最后用原来报障的入口重走一次。{% post_link 三台域控部署实录 "后来那次跨站点域控部署" %}

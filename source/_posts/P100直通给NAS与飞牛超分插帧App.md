@@ -1,5 +1,5 @@
 ---
-title: 飞牛 NAS 视频增强实录：P100 直通、任务续跑与成品验收
+title: "给 NAS 写了个插帧应用，跑到一半还能接着做"
 date: 2026-10-15 21:00:00
 updated: 2026-11-23 22:35:00
 tags:
@@ -12,13 +12,13 @@ categories:
   - 基础设施
   - 系统维护
 keywords: P100, DDA, Direct Device Assignment, 飞牛 fnOS, 超分, 插帧, appcenter, GPU 直通, NAS
-description: "用 Hyper-V DDA 给飞牛 NAS 直通 Tesla P100，再把超分与插帧接入应用界面。记录目录授权、单 GPU 队列和成品回读怎么落到代码里。"
+description: "一张直通给飞牛的 P100 跑超分和插帧。最费时间的是处理目录权限、任务中断和成品检查。"
 cover: /img/cover/p100-ffd.jpg
 toc: true
 copyright: true
 ---
 
-给 NAS 里的老片做插帧，最烦的是跑完才发现结果写不进去。我原来用脚本处理，后来给飞牛做了应用界面，直接选片源、看成品路径，失败的任务也能回到明确状态。算力来自一张 Tesla P100 16 GB。飞牛本来就跑在 Hyper-V 虚拟机里，我把这张卡直接分配给它。
+给 NAS 里的老片插帧，最浪费时间的是跑完才发现成品写不进去。我原先用脚本，后来给飞牛做了个能选片、看进度和成品目录的应用。飞牛已经跑在 Hyper-V 里，就把那张 Tesla P100 16 GB 直接交给这台虚拟机。
 
 我把这件事按一个能留在 NAS 上长期用的应用来做。源片由现有共享目录管理，视频任务可长达数小时，机器还承担其他服务。我的工作从 GPU 直通走到应用入口、任务调度、续跑和成品核验。能运行模型只是最前面的一步。真正影响日常体验的是目录权限变化后能及时停下来、服务重启后知道从哪里续，以及最后打开的是一份正常的视频。
 
@@ -126,6 +126,6 @@ def scheduler():
 
 有一轮 4K 长片在应用中心重启后被标为失败，检查点仍在。恢复任务后，计数从 33,936 增到 33,984，说明 worker 又开始处理。那份记录收尾时，整片尚未完成，成品回读和抽帧目检也未完成。我把这次结果记作恢复成功，成品验收留空。
 
-最后的界面提示也区分三种结果。CPU 功能预览会缩小输入以检查流程；GPU 原尺寸样片只处理短片段，拿来确认画面和目标规格；整片任务结束后才展示成品的尺寸、帧率和时长。样片可以帮用户先发现模型风格和设置不合适，长片运行时间、最终封装和音轨都要到整片这条路径再核。读代码可以从预检开始，跟到任务启动、成品回读，最后看这些结果怎样写回任务。 [成品回读](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/worker.py#L374) · [三种结果的界面口径](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/server.py#L222)
+我把界面的提示做成三种。CPU 预览用缩小的输入跑流程，GPU 样片用原尺寸处理一小段，整片跑完才显示成品的尺寸、帧率和时长。看风格、试设置，用样片省时间。音轨、封装和长片用时得等整片。想顺代码看，从预检一路读到启动 worker，再看成品检查怎样写回任务。[成品检查](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/worker.py#L374) · [三种结果的界面提示](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/server.py#L222)
 
 私人环境里曾遇到整包升级覆盖热修，后来把热修绑定到具体应用版本。本文对应公开源码的版本号是 [0.3.12](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/version.py#L2)。[项目仓库](https://github.com/opsbsligm/fnos-video-enhance)提供源码、打包和测试脚本，公开仓未附 `.fpk` 安装包、模型权重或运行包。飞牛跨大版本升级后的直通表现仍待复测。

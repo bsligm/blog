@@ -1,5 +1,5 @@
 ---
-title: Windows Sandbox 实录：隔离遗留管理工具时，要核哪几条边界
+title: "借一个 Windows Sandbox 管老打印机"
 date: 2023-03-04 11:00:00
 updated: 2026-11-23 22:35:00
 tags:
@@ -10,13 +10,13 @@ categories:
   - 基础设施
   - 安全管理
 keywords: Windows沙盒, Sandbox, 安全隔离, 虚拟化, Flash Player, IE浏览器
-description: 复盘遗留打印机管理工具的隔离使用，区分文件映射、网络和剪贴板的风险，附离线只读配置示例。
+description: "一次 IC 卡维护用到了旧浏览器和插件。我把工具放进临时桌面，另外留了一个离线只读的配置例子。"
 cover: /img/cover/windows-sandbox.jpg
 toc: true
 copyright: true
 ---
 
-旧打印机的后台依赖当时的浏览器和插件。终端支持有一次 IC 卡维护，但让过时的组件长期装在办公机上，会把本来一次性的兼容需求变成长期维护负担。于是把那次操作放进临时 Windows Sandbox 会话，日常浏览和工作仍留在宿主。本文是 2023 年遗留环境的记录。长期应采用厂商支持的管理入口。
+2023 年帮忙做一次 IC 卡维护，旧打印机后台还要用旧浏览器和插件。我只为这次操作开了个 Windows Sandbox，日常办公留在宿主。用到的网络和目录得另外管，尤其是共享目录，关窗口也不会把写进宿主的东西收回来。长期运行应换成厂商支持的管理入口。
 
 ![Windows 沙盒架构](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/image-20230303131900199.png)
 
@@ -52,7 +52,7 @@ Windows Sandbox 提供临时桌面。会话结束后，沙盒里安装的应用�
 </Configuration>
 ```
 
-先看环境是否执行了所选的规则，再看工具行为。配置文件被打开与所有策略都按预期生效是两件事。目标 Windows 版本、管理员策略和硬件都会影响功能，实际跑过的现象要写到验收记录。
+配置打开后，我会先读一遍样例文件，再试写一份进去，看是否真被拦住。换 Windows 版本、管理员策略或硬件以后，用同样的两步再验。
 
 ## 当时验证了哪一步
 

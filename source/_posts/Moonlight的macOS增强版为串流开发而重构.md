@@ -1,5 +1,5 @@
 ---
-title: Moonlight macOS 增强实录：设备列表的异步竞态怎么修
+title: "Moonlight 上拔掉设备后，列表为什么又把它画出来"
 date: 2026-10-19 21:00:00
 updated: 2026-11-23 22:35:00
 tags:
@@ -12,13 +12,13 @@ categories:
   - 系统维护
   - 桌面维护
 keywords: Moonlight, Sunshine, macOS, 串流, Xcode, CI, USB 设备诊断
-description: "从切页拔插后设备列表偶尔回退开始，追到 Moonlight macOS 的两个异步数据源。记录如何淘汰旧结果，以及设置迁移、CI、帧时间采样和公开发行怎么核验。"
+description: "在 Mac 上改 Moonlight 时，我遇到设备拔掉后旧结果还会写回界面。这篇也记了设置迁移、打包和实机串流。"
 cover: /img/cover/moonlight-stream.jpg
 toc: true
 copyright: true
 ---
 
-我在 Mac 上调串流时，遇到过一个不容易重现的现象。设备已经拔掉，切回设置页却还能看到它。列表再刷一次又对了。这样的故障多拔插几次未必能说明问题，关键要看扫描期间页面状态何时变了，回调为什么还能更新界面。我保留台式机端的 Sunshine 服务，从客户端设备页追这条时序。当时也在做原生设置和发行，所以得把同一处改动带过配置回读、实机诊断和打包。
+设备明明拔了，切回 Moonlight 的设置页，它又回到了列表上。等下一次刷新，列表自己好了。我没动台式机上的 Sunshine，先跟 Mac 上那次扫描，看页面切走以后，旧回调还有没有机会把结果画回来。这阵子也在改原生设置和打包，所以这项修改最终还要从安装和实机再走一遍。
 
 Sunshine 在台式机上捕获和编码画面，Mac 上的 Moonlight 接收、解码并显示，再把键盘和手柄输入送回去。改客户端设置时，得分清哪些选项会在开始串流时与主机协商，哪些只会改变 Mac 本机的显示或输入行为。比如提高客户端的目标帧率，需要主机实际按相应速率出帧，Mac 本地的设备列表则由 macOS 枚举。
 
@@ -48,7 +48,7 @@ private func scanBus() {
 }
 ```
 
-这里的 generation 是页面当前这轮扫描的编号。设想第一次扫描后台还在跑，用户拔了设备、切到别页又切回来。第一次扫描晚到的结果如果直接覆盖界面，就会把旧设备重新画回来。主线程回调先核对页面状态和编号，过期结果丢弃。页面仍可见时再补扫，让界面从新的总线快照生成。VID/PID 代表厂商和产品类型，可用于匹配规则，同型号设备的唯一身份还得看单独的标识。实际实现见 [设备页扫描](https://github.com/opsbsligm/moonlight-macos-enhanced/blob/cc6aa76f1459/Limelight/macOS/ViewControllers/SettingsDevicesPane.swift#L639)。
+我给每轮扫描留了个编号。比如扫到一半拔设备、切去别页又回来，旧回调这时才交结果，界面就可能把拔掉的设备画回来。回调先检查页面和编号，旧结果丢掉。页面还开着就补扫一次。VID/PID 只够识别厂商和产品类型，要认同型号中的某一台，还得看设备自己的标识。[设备页扫描](https://github.com/opsbsligm/moonlight-macos-enhanced/blob/cc6aa76f1459/Limelight/macOS/ViewControllers/SettingsDevicesPane.swift#L639)
 
 设备页其实收两种异步结果。总线扫描读的是这台 Mac 的设备。远端主机检查读的是当前选中主机的状态。切主机时，本机 USB 枚举的意义没变，旧主机的检查结果却已经不能用。所以代码分别保存 `busScanGeneration` 和 `hostCheckGeneration`，发布主机结果前另外核对还是不是同一台主机。回归时我把场景拆成拔插、切页和切主机，分别观察设备行是否消失、旧扫描会不会覆盖新列表、上一个主机的诊断状态会不会串过来。 [主机检查的发布条件](https://github.com/opsbsligm/moonlight-macos-enhanced/blob/cc6aa76f1459/Limelight/macOS/ViewControllers/SettingsDevicesPane.swift#L621)
 

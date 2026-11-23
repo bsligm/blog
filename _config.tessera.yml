@@ -35,8 +35,8 @@ index_layout: 6
 # 首页开屏模块
 home_top:
   enable: true
-  title: 算力 · 身份 · 交付物
-  subTitle: 在算力、模型与交付物之间，探寻 AI 的落地路径
+  title: 折腾 AI 基础设施
+  subTitle: 搭环境，跑模型，也记卡住的时候。
   siteText: LIGUANGMING
   icons:
     - icon: fas fa-terminal
@@ -87,7 +87,7 @@ home_top:
   banner:
     enable: true
     tips: 置顶
-    title: DGX Spark 上的 vLLM 与多 Agent 接入
+    title: 一台 DGX Spark，怎么接我平时用的 Agent
     image: /img/cover/dgx-spark-vllm.jpg
     link: /2026/11/19/DGX-Spark-vLLM%E9%83%A8%E7%BD%B2%E4%B8%8E%E5%A4%9AAgent%E6%8E%A5%E5%85%A5/
     button: 阅读全文

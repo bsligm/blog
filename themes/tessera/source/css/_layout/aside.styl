@@ -1,9 +1,20 @@
 #aside-content
+  align-self: stretch
   width: 26%
   min-width: 0
   transition: width .3s ease, opacity .3s ease, padding .3s ease, visibility .3s
 
   +minWidth900()
+    // 整列 sticky：侧栏与正文同高（stretch）并随视口固定，内容超高时内部滚动，
+    // 避免侧栏无限延伸、正文读完侧栏还在
+    position: sticky
+    position: -webkit-sticky
+    top: 110px
+    max-height: calc(100vh - 130px)
+    overflow-y: auto
+    overscroll-behavior: contain
+    scrollbar-width: thin
+
     if hexo-config('aside.position') == 'right'
       padding-left: 15px
     else

@@ -239,12 +239,12 @@ aside:
       text: Follow Me
       link: https://github.com/opsbsligm
   card_announcement:
-    enable: true
+    enable: false
     content: This is my Blog
   card_recent_post:
     enable: true
     # 设为 0 显示全部
-    limit: 5
+    limit: 3
     # 排序: date（发布）/ updated（更新）
     sort: date
     sort_order:
@@ -258,14 +258,14 @@ aside:
   card_categories:
     enable: true
     # 设为 0 显示全部
-    limit: 8
+    limit: 6
     # 可选: none / true / false
     expand: none
     sort_order:
   card_tags:
     enable: true
     # 设为 0 显示全部
-    limit: 40
+    limit: 18
     color: false
     custom_colors:
     # 标签排序依据: random / name / length
@@ -282,7 +282,7 @@ aside:
     # 排序方向: 1 升序; -1 降序
     order: -1
     # 设为 0 显示全部
-    limit: 8
+    limit: 6
     sort_order:
   card_post_series:
     enable: true
@@ -293,7 +293,7 @@ aside:
     # 排序方向: 1 升序; -1 降序
     order: -1
   card_webinfo:
-    enable: true
+    enable: false
     post_count: true
     last_push_date: true
     sort_order:

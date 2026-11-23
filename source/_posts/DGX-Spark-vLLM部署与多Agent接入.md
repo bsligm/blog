@@ -1,7 +1,7 @@
 ---
 title: DGX Spark 部署 vLLM：256K 上下文本机推理与四类 Agent 接入实录
 date: 2026-11-19 20:10:00
-updated: 2026-11-23 18:25:00
+updated: 2026-11-23 18:37:00
 tags:
   - DGX Spark
   - vLLM
@@ -18,7 +18,9 @@ toc: true
 copyright: true
 ---
 
-我买 DGX Spark，是想把编码会话里的长上下文留在自己手里。模型拉起来以后，还要检查工具调用能否作为结构化事件交给客户端。我把验收分成两部分：引擎能接多长的输入、承受多少并发，以及每个客户端能否完成工具调用、压缩和续答。
+这是我在家庭实验室做的单机推理项目。起因很简单：写代码时，一轮会话会带上系统提示词、工具定义、历史记录，偶尔再塞进去一大段工具输出。我想让这些长会话优先留在本机，四类客户端仍按各自熟悉的协议使用。
+
+我负责的是整条接入链：选定引擎与内存预算、布置 LiteLLM 网关、在协议边界处理客户端差异，再看长窗口和并发实际能做到什么程度。模型能输出一句话，只完成了引擎这层。客户端还要接回结构化工具调用，能把工具结果交还模型，长会话压缩以后也要能接着跑。最终 Codex 和 WorkBuddy 完成了真实客户端验收，Claude Code 和 dsh 做到协议和配置验证。容量结论基于已测的单路、双路样本。
 
 ## 机器与环境
 
@@ -48,7 +50,7 @@ model_list:
 
 ## vLLM 参数逐条
 
-版本 `0.1.dev20073+g8e685d198`，NVFP4 量化权重。启动命令去掉路径与无关环境变量后是这样：
+版本 `0.1.dev20073+g8e685d198`，NVFP4 量化权重。下文是这次部署的参数摘录，权重挂载、镜像配置和图捕获相关配置随模型及构建一起校验。示例里的省略项需要用自己的构建配置补齐。
 
 ```bash
 vllm serve /models/candidate \
@@ -68,13 +70,13 @@ vllm serve /models/candidate \
   --compilation-config '{"cudagraph_mode":"PIECEWISE","splitting_ops":[...]}'
 ```
 
-**`--max-model-len 262144`。** 256K 窗口。KV cache 占用与窗口长度线性相关，这一项决定后面所有并发数字。
+**`--max-model-len 262144`。** 256K 是单个请求的序列上限。长序列会占用更多缓存块，实际并发还取决于同时在跑的请求长度、前缀复用和缓存预算。
 
 **`--gpu-memory-utilization 0.80`。** vLLM 默认是 0.9。统一内存架构下 0.9 会挤压系统页缓存和宿主进程，早期出现过内存回收引起的请求毛刺，降到 0.80 之后没再复现。降低的是引擎的内存预算，宿主实际余量以运行时读数为准。
 
 **`--max-num-seqs 8`。** 调度上限，不是容量声明。后文会看到真实可用并发远低于它。
 
-**`--enable-prefix-caching`。** 收益最大的一项。Agent 多轮请求前缀高度重复（system + 工具定义 + 历史），复测时把缓存冷启动和命中后的首 token 延迟分开。
+**`--enable-prefix-caching`。** Agent 多轮请求的 system 提示、工具定义和历史常有重复。开启前缀缓存是为了复用已计算的部分。复测时把缓存冷启动和命中后的首 token 延迟分开。
 
 **`--enable-chunked-prefill` 与 `--max-num-batched-tokens 8192`。** 256K 窗口的长 prompt 如果整块预填充，会把正在解码的请求全部堵住。分块之后 8192 token 一批，预填充可以和已有解码任务交错调度。批大小从 4096 试到 8192，再往上首 token 延迟开始回弹。
 
@@ -139,6 +141,8 @@ vllm serve /models/candidate \
 | WorkBuddy | Chat Completions | `base_url` 加模型名 |
 | dsh | Chat Completions | 两个 compat 开关 |
 
+这张表的前四项配置只是接线。比如网关能接受一条 Messages 请求，可以说明请求转换完成，至于 Claude Code 能否读出分段的工具调用、报错时显示哪条提示，还得在真实客户端查一次。相反，Codex 能完成真实会话，也不代表同样的请求在 Chat Completions 路径有完全一致的控制字段。
+
 **Codex** 走 Responses API。除 `base_url`、`env_key` 外必须显式声明三项窗口参数：`model_context_window=262144`、`model_auto_compact_token_limit=131072`、`tool_output_token_limit=8192`。第一项客户端会按模型名猜，猜错直接超窗；后两项不写的话一次工具输出就能把整个历史撑爆，实测有过 584098 字节的单次工具输出进历史。压缩走原生 `POST /v1/responses/:compact`，需要在边界代理白名单里单独放行。
 
 **Claude Code** 的协议兼容性使用环境变量配置，网关地址与模型别名分别设置：`ANTHROPIC_BASE_URL`、`ANTHROPIC_MODEL`、`ANTHROPIC_DEFAULT_OPUS_MODEL`、`ANTHROPIC_DEFAULT_SONNET_MODEL`、`ANTHROPIC_DEFAULT_HAIKU_MODEL`，凭据走 `ANTHROPIC_AUTH_TOKEN`。网关侧也要核对协议版本头和错误响应。缺少错误体里的 `type: "error"` 时，客户端只显示通用提示。
@@ -152,6 +156,20 @@ ZCode 也接过，同样要显式指定窗口（它按官方模型名做能力�
 **边界说明**：Claude Code 与 dsh 在这台机器上没有真机安装，只做到协议层与配置层验证。真机端到端跑通的是 Codex 与 WorkBuddy。总验收口径：协议转换用例 57/57、parser 用例 57/57、真实客户端用例 32/32，250046 input token 下三处位置标记全部识别正确。
 
 复测时我会先接一个无副作用的工具，例如输入整数并返回它的平方。看模型是否识别该工具、客户端是否拿到结构化调用、执行结果能否带回会话、模型是否正常续答。流式用例再检查参数片段能否拼回合法 JSON。把同一用例在协议脚本和真实客户端分别执行，协议兼容和客户端可用性各有自己的记录。
+
+一条最小的测试输入可以这样写。它描述期望的证据，和生产用的客户端配置分开：
+
+```yaml
+input: "请调用 square，输入 7，然后告诉我结果。"
+expected:
+  tool: square
+  arguments:
+    number: 7
+  tool_result: 49
+  final_answer_contains: "49"
+```
+
+只检查最终文本会有假阳性，模型自己也能算出 49。要在客户端测试里同时核对结构化工具事件和工具结果回传，才能确认调用真的经过了这条链路。
 
 ## 思考档位映射
 

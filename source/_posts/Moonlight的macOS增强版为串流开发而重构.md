@@ -1,7 +1,7 @@
 ---
 title: 为串流开发重构 Moonlight：macOS 增强版的八周记录
 date: 2026-10-19 21:00:00
-updated: 2026-11-23 18:25:00
+updated: 2026-11-23 18:37:00
 tags:
   - Moonlight
   - 串流
@@ -21,6 +21,8 @@ copyright: true
 我在 Mac 上调试游戏串流。有些参数改一次就得翻一次 plist，设备偶尔掉线时，列表还会留着上一轮的结果。手工改配置能解决一次问题，第二天换设备重测又得从头核对。我保留台式机端的 Sunshine 服务，花了八周改 Moonlight macOS 客户端，先把常调的参数搬进设置页，再加上能回看的设备和会话诊断。
 
 Sunshine 在台式机上捕获和编码画面，Mac 上的 Moonlight 接收、解码并显示，再把键盘和手柄输入送回去。改客户端设置时，得分清哪些选项会在开始串流时与主机协商，哪些只会改变 Mac 本机的显示或输入行为。比如提高客户端的目标帧率，需要主机实际按相应速率出帧，Mac 本地的设备列表则由 macOS 枚举。
+
+我接手的是已有客户端，不能为了重做设置页让旧配置失效，也没有改 Sunshine 协议来迁就客户端。我的改动沿着三条具体路径落下去。第一条是从设置控件到保存、再到下次回读。第二条是从本机设备扫描到界面，以及主机配对状态改变时如何更新诊断。第三条是从构建后的 App 到用户下载的 DMG。它们用三套不同的证据核对。设置要看行为能否跨启动保留，设备页要看旧结果有没有回写，发行则要看包内版本和公开附件。
 
 ## 先改每天都要用的地方
 
@@ -61,6 +63,8 @@ private func scanBus() {
 
 这里的 generation 是页面当前这轮扫描的编号。设想第一次扫描后台还在跑，用户拔了设备、切到别页又切回来。第一次扫描晚到的结果如果直接覆盖界面，就会把旧设备重新画回来。主线程回调先核对页面状态和编号，过期结果丢弃。页面仍可见时再补扫，让界面从新的总线快照生成。VID/PID 代表厂商和产品类型，可用于匹配规则，同型号设备的唯一身份还得看单独的标识。实际实现见 [设备页扫描](https://github.com/opsbsligm/moonlight-macos-enhanced/blob/cc6aa76f1459/Limelight/macOS/ViewControllers/SettingsDevicesPane.swift#L639)。
 
+设备页其实收两种异步结果。总线扫描读的是这台 Mac 的设备。远端主机检查读的是当前选中主机的状态。切主机时，本机 USB 枚举的意义没变，旧主机的检查结果却已经不能用。所以代码分别保存 `busScanGeneration` 和 `hostCheckGeneration`，发布主机结果前另外核对还是不是同一台主机。回归时我把场景拆成拔插、切页和切主机，分别观察设备行是否消失、旧扫描会不会覆盖新列表、上一个主机的诊断状态会不会串过来。 [主机检查的发布条件](https://github.com/opsbsligm/moonlight-macos-enhanced/blob/cc6aa76f1459/Limelight/macOS/ViewControllers/SettingsDevicesPane.swift#L621)
+
 ## 持久化配置和界面顺序分开
 
 这部分改动主要在 macOS 的设置页和诊断页。分区枚举有一处容易被当成笔误的编号：
@@ -94,9 +98,11 @@ if #available(macOS 27.0, *) {
 
 选中态交给系统绘制，应用负责维护选择值、显示顺序与配置迁移。[原生标签栏实现](https://github.com/opsbsligm/moonlight-macos-enhanced/blob/cc6aa76f1459/Limelight/macOS/ViewControllers/LiquidGlass/LiquidGlassTabBar.swift)。
 
+兼容旧分区编号只是第一步。旧配置里的字段可能缺失，界面仍然要给出明确值。以视频时序为例，模型读取 VSync 和时序缓冲级别，前者缺失时取默认值，后者把已保存的整数映射回下拉选项。复核这类改动时，我会分别拿空配置和已有配置启动，再改一次设置、重启回读。只检查界面画出来，会漏掉“第一次看着对，下次启动回到了默认值”的问题。 [旧字段回读与缺省值](https://github.com/opsbsligm/moonlight-macos-enhanced/blob/cc6aa76f1459/Limelight/macOS/ViewControllers/SettingsModel%2BPersistence.swift#L356)
+
 ## 同一个审计任务为何耗时差十倍
 
-当时一项审计和构建、其他测试争用同一台 macOS runner，并发时触发了原有超时，日志最后只剩 `Terminated: 15`。同一审计单独运行约 140 秒，争用时曾超过半小时。这个对照把排查范围缩到了调度和资源，单看 SIGTERM 无法做同样的判断。
+当时一项审计和构建、其他测试争用同一台 macOS runner，并发时触发了原有超时，日志最后只剩 `Terminated: 15`。同一审计单独运行约 140 秒，争用的一次执行跑到 1,803 秒后触发了 30 分钟门槛。这两次是历史现场记录。这个对照把排查范围缩到了调度和资源，单看 SIGTERM 无法做同样的判断。
 
 处理分三层：
 
@@ -127,6 +133,8 @@ workflow:
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Contents/Info.plist")
 BUILD_NUM=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_PATH/Contents/Info.plist")
 ```
+
+这次收口后，发布核对多了一步真正读取产物。打包脚本拿到的是 App 自己声明的版本，下载者拿到的是有架构标记和校验文件的 DMG。CI 变量适合发起构建，排查版本串包时应检查包内信息；SHA-256 校验可以核对下载是否一致，无法用来判断签名、公证或某台设备的实际兼容性。
 
 ## 实机记录
 

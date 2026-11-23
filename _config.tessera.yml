@@ -99,7 +99,7 @@ search:
   local_search:
     preload: true
     top_n_per_article: 3
-# 评论：Giscus（GitHub 登录留言，评论存为仓库 issue）
+# 评论：Giscus（GitHub 登录留言，评论存入 GitHub Discussions）
 comments:
   use: Giscus
   text: true

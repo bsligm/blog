@@ -1,134 +1,51 @@
 ---
-title: PowerStore 3.x 升级实录：先固件后系统的顺序约束与维护窗口
+title: PowerStore 3.x 升级实录：版本兼容、维护窗口与业务验收
 date: 2023-07-28 09:40:00
-updated: 2026-11-20 12:00:00
+updated: 2026-11-23 17:30:00
 tags:
   - 存储
   - PowerStore
 categories:
   - 基础设施
 keywords: PowerStore, 驱动器固件升级, PowerStoreOS, NDU, 维护窗口
-description: PowerStore 3.x 升级手顺：先固件后 PowerStoreOS 的顺序约束、Call Home 维护窗口、NDU 期间 vVol 任务不可用的边界、自动下载只下载不安装的坑，维护窗口按设备数量累加（单台 1–1.5 小时）。
+description: 一份 PowerStore 3.x 维护记录，整理目标版本与盘固件的兼容性、群集健康检查、主机多路径和升级后的业务验收。
 cover: /img/cover/powersstore-upgrade.jpg
 toc: true
 copyright: true
 ---
 
-计算与存储主题的三篇老文是算力层与存储层的起点，这篇是存储层的一篇：DELL EMC PowerStore 是后来 PVE、虚拟化集群与备份策略的底座，备份仓库和 VM 数据面都依赖它。
+虚拟机和备份都压在同一套存储上时，升级窗口要同时回答两个问题。阵列升级期间，主机还有没有可用路径？升级结束后，哪些管理操作才能重新开放？这篇是 PowerStore 3.x 的维护记录，菜单和截图来自当时的版本。
 
-升级分三步：驱动器固件、PowerStoreOS 无中断升级（NDU）、PowerStore T 型号群集升级。顺序不能颠倒——先固件后系统，新 PowerStoreOS 对盘面固件有兼容性要求，反着做会把已升级的节点留在不受支持的组合上。升级期间配置变更与 vVol 等管理任务不可用，需预留维护窗口并完成健康检查。
+## 先定升级路径
 
-控制台入口统一写作 **Settings → Cluster → Upgrades**，中文语言包环境是「设置 → 群集 → 升级」，同一入口，下文不再重复。
+旧稿把「先升盘固件，再升系统」写成了通用顺序。Dell 的驱动器固件 FAQ 建议**先升级 PowerStoreOS，再安装与目标版本兼容的盘固件包**。开始前按设备型号、当前版本和目标版本查发行说明，确认是否需要中间版本、适用的健康检查包以及盘固件支持范围。包名里的构建号只能用来识别软件包。
 
-## 驱动器固件升级
+Dell 还记录了一个容易漏掉的情况。部分盘固件更新在 PowerStoreOS 3.0.x 和 3.2.0.x 上可能报告成功，但实际没有更新任何驱动器。以管理界面读到的逐盘固件版本为准。[Dell 盘固件 FAQ](https://www.dell.com/support/kbdoc/en-us/000214519/powerstore-powerstore-drive-firmware-upgrades-and-frequently-asked-questions-faq)
 
-### 1. 禁用 Call Home 通知
+## 维护窗口怎么排
 
-防止升级期间向支持部门发 Call Home 警报：
+1. 记录每台设备的 OS 和驱动器固件版本、群集健康状态、关键卷的主机连接与多路径状态。对照目标版本的升级文档执行预升级健康检查。遇到阻断项，查清原因后再排期。
+2. 从主机侧确认两节点的备用路径可用，并与虚拟化、备份团队对齐维护时间。把计划中的 vVol 创建、迁移和快照任务挪出窗口。具体受限操作以本次版本的升级文档为准。
+3. 给管理会话切换、健康检查重跑和业务回验留时间。时间按设备数量、版本路径、现场负载及评估结果安排。盘固件阶段应单独估时，驱动器数量和 I/O 压力都会影响时长。
+4. 需要抑制 Call Home 通知时，在 PowerStore Manager 的 **Settings → Support** 里按设备启用维护模式，按预计作业时长设置截止时间，结束后确认通知恢复。
 
-1. **Settings → Support** →「禁用支持通知」
-2. 选中要暂停通知的设备，点「修改」
-3. 在维护模式面板里勾选「启用维护模式」，指定维护窗口小时数（PowerStore T 型号群集指定 2 小时）
-4. 点「应用」，对群集中其他设备重复
+[参照 Dell 的 NDU 准备指南](https://www.dell.com/support/kbdoc/en-us/000183630/powerstore-how-to-prepare-for-a-powerstore-non-disruptive-upgrade-ndu)
 
-### 2. 更新驱动器固件
+## 执行顺序和检查点
 
-从 DELL 支持网站下载最新的驱动器固件更新包，然后：
+当时的版本在 **Settings → Cluster → Upgrades** 上传、选择和安装升级包。点开始前重新核对设备与包版本。启用自动下载的环境也要做这一遍，真正用的是窗口里选中的包。
 
-1. 进入 **Settings → Cluster → Upgrades** →「上传程序包」，选中固件包上传，包会显示在软件包表中
-2. 在软件包表中选中该包，点「升级」
+![PowerStore Manager 的上传入口](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202307280941821.png "上传程序包按钮")
 
-上传前先确认页面右上角的群集上下文，传错群集等于白升：
+![选择升级文件](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202307280941330.png "选择文件对话框")
 
-![上传程序包](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202307280941821.png "上传程序包按钮")
+| 检查点 | 需要确认的结果 |
+| --- | --- |
+| PowerStoreOS 升级中 | 从主机侧观察路径和 I/O。管理会话断开时，重连后核对升级任务和群集状态 |
+| PowerStoreOS 升级后 | 所有目标节点版本正确，群集健康，主机路径恢复到基线，再进入盘固件阶段 |
+| 盘固件升级后 | 在 **Hardware → Drives** 核对适用驱动器的实际固件版本，检查告警是否清除 |
+| 恢复变更前 | 验证关键存储路径和代表性业务，确认支持通知恢复，再开放暂停的任务 |
 
-![选择文件](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202307280941330.png "选择文件对话框")
+面对失败先保留任务状态和告警。版本不一致、主机路径异常或健康检查阻断时，停止推进并按对应版本的 Dell 指引处理。能否回退取决于当前升级阶段和厂商支持路径，执行前就要确认。
 
-**验证固件版本**，四种方式任选：
-
-1. REST API（口令写在命令行会进 shell history，建议交互式输入或凭据文件）：
-   ```bash
-   curl -kv --user admin:<password> -X GET https://<appliance IP>:443/api/rest/software_package?select=* | python -mjson.tool
-   ```
-
-2. CLI（`-p` 后留空可交互式输入）：
-   ```bash
-   pstcli -d xx.xx.xx.xx -u <user> -p <password> software_package show-output nvp | grep -E "name|software_package_type|release_version"
-   ```
-
-3. PowerStore Manager：硬件 > 设备 > appliance > 组件 > 驱动器页面
-
-4. 服务命令（`svc_diag` 需 service 账户，`admin` 与 `<user>` 均无权限）：
-   ```bash
-   svc_diag list --show_drives
-   ```
-
-## PowerStoreOS 无中断升级
-
-### 1. 升级准备
-
-1. 上传最新 PowerStoreOS（未启用自动下载时）
-2. 查看发行说明
-3. 跑升级前运行状况检查与其他必要检查
-4. 确认两个节点的主机连接都有备用连接
-5. 升级前完成所有配置变更与管理操作——升级期间它们不可用，包括 vVol 虚拟机任务：创建、重启、迁移到其他 ESXi 主机、打快照
-
-### 2. 自动下载
-
-启用 SupportConnect 的群集可从支持网站安全隧道自动拉取更新包（软件包、固件包、语言包、配套检查包），有新包时 Manager 发告警。启用方式：**Settings → Cluster → Upgrades** → 打开 Auto Download。
-
-两点必须清楚：
-
-- **自动下载只下载、不安装**，包落下后仍需手动选中点 Upgrade。
-- **新包会覆盖旧包**：同类型出现更高兼容版本时，已上传未安装的包会被替换。维护窗口按特定版本评估过的，下载后先确认包版本再动手，别等到执行当天发现被换过。
-
-## PowerStore T 型号群集升级
-
-### 1. 准备与上传
-
-1. 按上文禁用 Call Home 通知
-2. 从支持网站下载最新的 PowerStore T 升级程序包
-3. **Settings → Cluster → Upgrades** →「上传程序包」，选中包上传
-
-执行前完整走一遍知识库文章 000183630《如何准备 PowerStore 无中断升级(NDU)》（Dell Support 站点 https://www.dell.com/support 可按编号搜索）。
-
-### 2. 执行
-
-1. 按下一节的单设备操作步骤执行，耗时与会话处理以该节为准
-2. PowerStoreOS 升级成功后，在新固件捆绑包可用时升级驱动器固件
-
-> 升级失败时，先解决群集上的所有关键警报再重试。
-
-### 3. 单设备操作步骤
-
-单设备升级约 1–1.5 小时，维护窗口按设备数量累加：
-
-1. 打开 PowerStore Manager，进入 **Settings → Cluster → Upgrades**
-2. 包未上传过就先上传（步骤同上）
-3. 在软件包表中选中 PowerStore T 升级包，点「升级」
-4. 等待完成，期间页面可能返回登录屏幕
-5. 跳回登录屏后，**关掉旧浏览器会话、开新会话重新登录**刷新 UI
-
-### 4. 升级过程发生了什么
-
-主设备的主节点会故障切换到辅助节点，管理会话随之断开，Manager 要等故障切换完成才能重新登录。主机 I/O 由 NDU 保证不中断，受影响的是管理面不是数据面——这也是升级窗口内不排配置变更和 vVol 任务的原因。
-
-界面自定义不随升级保留：各列表的列布局装上新版 PowerStoreOS 后重置为默认。依赖自定义列（如按容量使用率排序的视图）的，提前告知，升级后重新配置。
-
-## 关键设计决策
-
-**三层升级顺序：微码/固件 → PowerStoreOS → 应用层（含 vVol 任务）。** 驱动器固件对宿主 OS 版本有兼容要求，先升 OS 再把固件留在旧版，中间任何一步失败，群集停在不受支持的组合上。应用层排在数据面稳定之后，因为升级期间 vVol 的创建/迁移/打快照全不可用，业务侧变更不能和升级同窗口。
-
-**回滚窗口在第一次故障切换之前。** NDU 是节点级滚动升级：主设备主节点故障切换到辅助节点后，旧版 PowerStoreOS 仍在辅节点上。第一台设备的升级完成前出问题时，回滚成本最低；多台设备滚动推进之后，回滚要逐台反向操作，窗口要按设备数量重新算。
-
-**PowerStore T 与标准型的差异：窗口和流程不同。** T 系列（型号后缀 T，TLC 盘，如 1000T/3000T/9000T，从 500T 到 9200T）单台升级 1–1.5 小时，维护窗口按设备数量累加；标准型号走 NDU 流程，窗口按节点滚动估算。两者共用 Settings → Cluster → Upgrades 入口，但升级包类型、失败重试条件和回滚路径都不同，执行前确认群集型号再取对应手顺。
-
-**自动下载只下载不安装，且新包会覆盖旧包。** 包被换过而维护窗口仍按旧版本评估过，执行当天才发现就要重新排期。所以下载后先确认包版本再动手，这条比"自动下载方便"更值钱。
-
-## 总结
-
-- **顺序**：禁 Call Home 开维护模式 → 驱动器固件 → PowerStoreOS，颠倒则节点落在不受支持的固件组合上。
-- **估时**：单台 1–1.5 小时按台数累加，不按"一次升级"估。
-- **登录屏跳回是正常过程**不是升级失败；完成后必须换新会话登录，否则 UI 还是旧版缓存。
-- **vVol 虚拟机任务（创建/迁移/打快照）升级期间全不可用**，提前与虚拟化团队错开。
-- **自动下载只取包不安装**；升级失败先清关键警报再重试，别在警报未清时反复提交。
+这次最值得保留的是验收顺序。先回读阵列版本，再从主机侧看 I/O，最后让虚拟化和备份恢复任务。维护窗口应该排到业务验证结束。

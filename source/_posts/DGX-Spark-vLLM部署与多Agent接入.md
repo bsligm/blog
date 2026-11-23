@@ -1,7 +1,7 @@
 ---
 title: DGX Spark 部署 vLLM：256K 上下文本机推理与四类 Agent 接入实录
 date: 2026-11-19 20:10:00
-updated: 2026-11-20 12:00:00
+updated: 2026-11-23 17:30:00
 tags:
   - DGX Spark
   - vLLM
@@ -12,65 +12,31 @@ categories:
   - 系统运维
   - 基础设施
 keywords: DGX Spark, GB10, vLLM 部署, NVFP4, 统一内存, LiteLLM 网关, 投机解码 MTP, reasoning_effort, Codex, Claude Code
-description: 256K 上下文本机推理落地 DGX Spark 的完整记录：逐条有出处的 vLLM 参数、经 LiteLLM 接入四类 Agent 客户端的兼容坑、并发与超时的真实归因、多模态识别策略。
+description: 一台 DGX Spark 跑 256K 窗口的 vLLM，记录 LiteLLM 协议适配、真实客户端验收、并发样本和识图隔离。
 cover: /img/cover/dgx-spark-vllm.jpg
 toc: true
 copyright: true
 ---
 
-买一台 DGX Spark 的目标很直接：把手上几个 AI 编码 Agent 从按 token 计费的订阅 API 挪回内网，长上下文的成本和会话数据都不再出境。跑了八周，最花时间的不是 vLLM 本身，而是让四个协议、思考档位语义和工具调用格式都不同的 Agent 客户端在同一台推理机上同时正常工作。下面按部署顺序记录，每个参数给出取舍理由，未验证的部分单独标出。
+我买 DGX Spark，是想把编码会话里的长上下文留在自己手里。模型拉起来以后，还要检查工具调用能否作为结构化事件交给客户端。我把验收分成两部分：引擎能接多长的输入、承受多少并发，以及每个客户端能否完成工具调用、压缩和续答。
 
 ## 机器与环境
 
-GB10 超级芯片，120GB 统一内存，aarch64，出厂预装 Ubuntu 24.04.5 LTS。
+本次用的是 GB10、Ubuntu 24.04.5 LTS / aarch64 和 580.178.04 驱动。[NVIDIA 官方规格](https://docs.nvidia.com/dgx/dgx-spark/hardware.html) 是 128 GB 统一内存，20 个 Arm 核心（10 个 Cortex-X925、10 个 Cortex-A725）。本机监控口径约 121 GiB，模型常驻时占用约 111 GiB，这份内存预算只能保留一个常驻模型。部署前还要检查镜像是否有 arm64 产物，我第一轮就遇到过仅提供 x86 镜像的组件。
 
-| 项目 | 实际值 |
-| --- | --- |
-| 系统 | Ubuntu 24.04.5 LTS / aarch64 |
-| 驱动 | 580.178.04 |
-| CPU | 20 核 Cortex-X925 |
-| 内存 | 121 GiB 统一内存 |
-| 待机功耗 / 温度 | 36 W / 60 ℃ |
-
-三条硬件特性决定了后面所有选择。
-
-**统一内存。** CPU 与 GPU 共享同一块物理内存，121 GiB 可以整体交给模型，这是这台机器敢开 256K 上下文的唯一原因。代价是模型常驻之后没有余量做别的，实测长期停在 111/121 GiB。
-
-**单卡。** 无法同时驻留两份完整模型，热切换时可用内存约 12 GiB，一次加载几十秒。"多模型路由"在这台机器上只能靠外部网关兜住回退，不能靠本机起多实例。
-
-**aarch64。** 所有镜像都要确认有 arm64 变体，只有 x86 的镜像在这一层直接失败，早期吃过一次。
-
-散热核验过：`nvidia-smi -q -d PERFORMANCE` 的 `clocks_event_reasons` 全程 `0x0`，没有主动降频事件；GB10 功耗上限只有百瓦级，散热裕量比预期大。
-
-网络用 netplan 静态地址，有线 `autoconnect-priority` 设 100，无线作备份。这个优先级不是可选项：早期无线没关自动连接，Wi-Fi 每次抖动都抢走默认路由，推理服务"突然连不上"发生了两次。
-
-监控接进现成 Zabbix（Agent2 7.4），加 7 个自定义 Item 和 3 个触发器，覆盖显存占用、KV cache 使用率、请求排队和温度。"swap 常态换页"明确判定为 GB10 稳态而非故障，否则告警天天响。
+有线与无线并存时，默认路由曾因无线重连改变。固定路由优先级后，用实际推理请求回测连通性。运行时把 KV 缓存、队列深度、内存压力和温度放在一起看，便于区分请求拥塞与宿主资源压力。
 
 ## 部署形态
 
-最终是五个容器，而不是一条 `docker run` 拉起全部。
-
-| 容器 | 职责 | 端口 |
-| --- | --- | --- |
-| PostgreSQL | 网关的密钥、消耗记录、用户 | 内部 |
-| vLLM | 模型引擎 | 内部 |
-| LiteLLM | 协议网关与路由 | 4000 |
-| API Gateway | 数据面边界代理 | 对外 |
-| Management Gateway | 管理面 Web UI | 4001 |
-
-拆开的理由是权限边界，不是微服务审美。
-
-- **master key 不进数据面。** API Gateway 只持有各 virtual key 的 SHA256 摘要，拿不到主密钥；管理面独立端口，不对公网暴露。
-- **路由与引擎解耦。** 引擎重启或换模型时，网关先把流量摘掉，客户端看到的是排队或回退，不是连接拒绝。
-- **边界代理承担兼容层。** 八百行左右的薄代理，负责思考档位映射、system 消息重排、输出预算补齐和协议错误体转换。这些逻辑放客户端要做四遍，放 vLLM 要改引擎源码，放在这一层只做一遍。
+服务拆成五个组件：vLLM 跑模型，LiteLLM 做协议转换和路由，PostgreSQL 保存网关状态，管理入口和 API 入口各自隔离。思考档位、system 消息、输出预算和协议错误体在 API 边界处理。
 
 LiteLLM 的模型注册用 YAML 声明式挂载，没用控制台的数据库注册。实测路由表在 `LiteLLM_ProxyModelTable` 里是 0 行，所有路由都来自挂载进容器的那份配置文件。排查时这个区别很关键：控制台看不到模型、或控制台改了不生效，先看文件而不是怀疑数据库。配置骨架：
 
 ```yaml
 model_list:
-  - model_name: qwen3.8-flash-next        # 对外别名，与权重仓库名解耦
+  - model_name: local-long-context        # 对外别名，与权重仓库名解耦
     litellm_params:
-      model: hosted_vllm/qwen3.8-flash-next
+      model: hosted_vllm/local-long-context
       api_base: http://<vllm-host>:<port>/v1
       api_key: os.environ/DGX_API_KEY
 # 家庭自用，价格全部置 0，只用于消耗记账，不参与计费
@@ -84,7 +50,7 @@ model_list:
 
 ```bash
 vllm serve /models/candidate \
-  --served-model-name qwen3.8-flash-next \
+  --served-model-name local-long-context \
   --max-model-len 262144 \
   --max-num-seqs 8 \
   --gpu-memory-utilization 0.80 \
@@ -102,17 +68,17 @@ vllm serve /models/candidate \
 
 **`--max-model-len 262144`。** 256K 窗口。KV cache 占用与窗口长度线性相关，这一项决定后面所有并发数字。
 
-**`--gpu-memory-utilization 0.80`。** vLLM 默认是 0.9。统一内存架构下 0.9 会挤压系统页缓存和宿主进程，早期出现过内存回收引起的请求毛刺，降到 0.80 之后没再复现。这不是玄学，是留 20 GiB 给引擎之外的进程。
+**`--gpu-memory-utilization 0.80`。** vLLM 默认是 0.9。统一内存架构下 0.9 会挤压系统页缓存和宿主进程，早期出现过内存回收引起的请求毛刺，降到 0.80 之后没再复现。降低的是引擎的内存预算，宿主实际余量以运行时读数为准。
 
 **`--max-num-seqs 8`。** 调度上限，不是容量声明。后文会看到真实可用并发远低于它。
 
-**`--enable-prefix-caching`。** 收益最大的一项。Agent 多轮请求前缀高度重复（system + 工具定义 + 历史），前缀缓存命中与否，首 token 延迟差的是数量级。
+**`--enable-prefix-caching`。** 收益最大的一项。Agent 多轮请求前缀高度重复（system + 工具定义 + 历史），复测时把缓存冷启动和命中后的首 token 延迟分开。
 
-**`--enable-chunked-prefill` 与 `--max-num-batched-tokens 8192`。** 256K 窗口的长 prompt 如果整块预填充，会把正在解码的请求全部堵住。分块之后 8192 token 一批，长请求插进来不会让在跑的流卡顿。批大小从 4096 试到 8192，再往上首 token 延迟开始回弹。
+**`--enable-chunked-prefill` 与 `--max-num-batched-tokens 8192`。** 256K 窗口的长 prompt 如果整块预填充，会把正在解码的请求全部堵住。分块之后 8192 token 一批，预填充可以和已有解码任务交错调度。批大小从 4096 试到 8192，再往上首 token 延迟开始回弹。
 
-**`--kv-cache-dtype bfloat16`。** 量化权重配 BF16 的 KV cache。KV 用 fp8 在这里没有收益：瓶颈是内存带宽而不是容量，精度损失会直接体现在长上下文的多跳检索上。
+**`--kv-cache-dtype bfloat16`。** 量化权重配 BF16 的 KV cache。这次保留 BF16。FP8 的容量、延迟和长文检索对照没有测完。
 
-**`--mamba-ssm-cache-dtype float32`。** 混合架构的线性注意力状态必须保持 fp32，半精度会数值漂移，表现为长会话后半段答案质量下降。架构要求，不是调优选项。
+**`--mamba-ssm-cache-dtype float32`。** 本次为线性注意力的状态缓存保留 FP32，未做独立的精度对照。
 
 **`--tool-call-parser qwen3_xml` 与 `--reasoning-parser qwen3`。** 工具调用走 XML 标记，思考内容独立成 reasoning 通道。两个 parser 配错的症状完全不同：前者是工具调用变成正文文本，后者是思考内容混进答案被客户端当成结果。
 
@@ -120,7 +86,7 @@ vllm serve /models/candidate \
 
 **`--limit-mm-per-prompt`。** 多模态上限，见后文。
 
-**PIECEWISE cudagraph 与 `splitting_ops`。** 混合架构下 FULL cudagraph 覆盖不到线性注意力的状态更新，必须分段捕获，代价是调度开销略高。部署这一代模型的必选项，不算性能优化项。
+**PIECEWISE cudagraph 与 `splitting_ops`。** 这份开发构建使用分段图捕获。`splitting_ops` 随镜像和模型实现变化，应与版本一起固定。
 
 权重挂载有个坑值得单列：容器内 `/models/candidate` 映射到宿主模型目录，但实际生效的 `config.json` 来自另一份实验目录里的覆盖文件。**在模型目录里改 config 不生效**，改完重启发现参数没变，第一反应会误判成版本没生效。定位方式是 `docker inspect` 看挂载表，不是看模型目录。
 
@@ -138,7 +104,7 @@ vllm serve /models/candidate \
 
 另有一条被推翻的假设值得记一笔：最初按"tokenizer 计数存在 25% 偏差"做过修正，后来判定这个修正本身不严谨——不同模型的 tokenizer 行为不同，正确做法是拿真实 token 数实测，而不是套一个比例系数。
 
-## 并发：没验证的部分比验证了的更重要
+## 两路样本充足，三路只有一个瞬时点
 
 从引擎调度日志采了 7983 条样本。
 
@@ -150,17 +116,11 @@ vllm serve /models/candidate \
 
 **持续 3 路并发可用这件事没有被证明。** 所以我不会写"这台机器支持 3 路并发"。网关侧并发门禁按 3 设置，是留了保守余量的。把 `max-num-seqs=8` 当 SLA 是这类部署最容易犯的错误：它只表示引擎最多愿意同时排 8 个序列，不表示 8 路都有可用延迟。
 
-超时的归因同样反直觉。一段连续超时，怀疑过模型或引擎，最后是三层客户端原因：
-
-- **本地并发门禁**：编排层 `maxConcurrency=1 / queueLimit=2`，超出直接返回 429，一天 104 条，请求根本没出门。
-- **客户端主动取消**：压缩请求 240 秒超时，取消掉 22 条。
-- **公网链路 502**：这一层根因目前仍未闭环。
-
-24 小时账本 570 success / 6 failure，p95 239.58 秒。p95 接近四分钟不是因为推理慢，而是包含排队与压缩等待；分层统计之后，真正落在推理上的延迟分布是正常的。
+24 小时账本记下 570 次成功、6 次失败，端到端 P95 为 239.58 秒。另一份客户端日志记录了 104 条本地限流拒绝和 22 次压缩取消，两处统计边界不同，不能直接相加。P95 包含队列、压缩和推理等待，现有数据不足以拆出引擎延迟。外部链路的 502 单列，原因尚未定位。
 
 ## 四类 Agent 的接入差异
 
-花时间最多的部分。四个客户端走三种协议，思考档位客户端七档、引擎只有三档，工具调用格式各不相同。
+四个客户端走三种协议。Codex 和 WorkBuddy 做了客户端端到端测试，Claude Code 和 dsh 的验收停在协议层和配置层。
 
 | Agent | 协议 | 关键配置 |
 | --- | --- | --- |
@@ -171,7 +131,7 @@ vllm serve /models/candidate \
 
 **Codex** 走 Responses API。除 `base_url`、`env_key` 外必须显式声明三项窗口参数：`model_context_window=262144`、`model_auto_compact_token_limit=131072`、`tool_output_token_limit=8192`。第一项客户端会按模型名猜，猜错直接超窗；后两项不写的话一次工具输出就能把整个历史撑爆，实测有过 584098 字节的单次工具输出进历史。压缩走原生 `POST /v1/responses/:compact`，需要在边界代理白名单里单独放行。
 
-**Claude Code** 不需要配置文件，五个环境变量指向同一个模型即可：`ANTHROPIC_BASE_URL`、`ANTHROPIC_MODEL`、`ANTHROPIC_DEFAULT_OPUS_MODEL`、`ANTHROPIC_DEFAULT_SONNET_MODEL`、`ANTHROPIC_DEFAULT_HAIKU_MODEL`，凭据走 `ANTHROPIC_AUTH_TOKEN`。网关侧要为 Anthropic 协议补两件事：CORS 显式放行 `x-api-key, anthropic-version, anthropic-beta, anthropic-dangerous-direct-browser-access`；错误体补 `type: "error"` 字段。缺后者时客户端不显示原因，只显示一句"请求失败"。
+**Claude Code** 的协议兼容性使用环境变量配置，网关地址与模型别名分别设置：`ANTHROPIC_BASE_URL`、`ANTHROPIC_MODEL`、`ANTHROPIC_DEFAULT_OPUS_MODEL`、`ANTHROPIC_DEFAULT_SONNET_MODEL`、`ANTHROPIC_DEFAULT_HAIKU_MODEL`，凭据走 `ANTHROPIC_AUTH_TOKEN`。网关侧也要核对协议版本头和错误响应。缺少错误体里的 `type: "error"` 时，客户端只显示通用提示。
 
 **WorkBuddy** 最省事，标准 OpenAI Chat Completions，给 `base_url` 和模型名就通。
 
@@ -183,7 +143,7 @@ ZCode 也接过，同样要显式指定窗口（它按官方模型名做能力�
 
 ## 思考档位：七档塌缩成三档
 
-引擎原生只有 low / medium / xhigh 三档，客户端暴露 high / xhigh / max / ultra。透传的结果是 400，必须在边界代理做映射：
+本次使用的引擎配置接受 low / medium / xhigh 三个档位。直接传入未支持的档位曾返回 400，网关按以下规则归并：
 
 ```text
 none / minimal / low       →  low
@@ -227,15 +187,9 @@ system 消息重排是另一处必改。Qwen 的 ChatML 只接受单条前导 sy
 
 引擎侧硬上限是单请求 64 张图，65 张直接 400。已验通过的组合：64 张 512px（三种协议）、64 张 1024px、4 轮历史各 16 张。被拒之后引擎本身健康，不是崩溃。代理层不做额外的图片裁剪或降采样，把上限交给引擎是更省事也更诚实的做法。
 
-## 让 WAF 只放行推理路径
+## 接入验收也要测拒绝路径
 
-推理服务经雷池 SafeLine 暴露到公网。默认策略下推理接口会被语义引擎误拦：工具调用的参数里出现 `git log --oneline -1`、`SELECT ... OR 1=1` 这类内容，命中 SQLi 和命令注入规则太正常了。
-
-社区版有条硬限制：站点级关闭内置增强规则会返回 `license required`，只剩语义 dry_run 加 ACL 精确放宽这一条路。做法是"POST 方法 + 五个推理 URI + JSON Content-Type"三条同时成立才放行，其余照旧拦截。
-
-关键在反向验证：用 GET 带一个 SQLi 探针打同一路径，仍然返回 403，证明放行规则没有越权。只验通"能过"不够，还得证明"别的情况过不去"。
-
-即便如此仍有 7 个边界样本被拦，原因未定位。另要明确：401 只证明请求到达了鉴权边界，不代表推理成功。
+接入测试记录 401 的来源，确认由预期的鉴权层返回。验证分三段：合法请求交给推理服务，未授权请求被拒，错误体能被客户端识别。成功拿到流式结果或工具调用以后，才记作业务通过。
 
 ## 其他几个坑
 
@@ -252,18 +206,10 @@ system 消息重排是另一处必改。Qwen 的 ChatML 只接受单条前导 sy
 
 - **持续 3 路并发未验证。** 要做受控压测才能给出容量结论。
 - **公网 502 根因未闭环。** 影响面小，但没定位。
-- **会话亲和导致重复命中同一个坏 key。** 同会话锁定同 key 并触发退避时表现为反复 502。根因已识别，修复被别的事打断，没落地。
 - **重会话压缩频率仍偏高。** 前缀 80-100K 的会话每 7-12 分钟压一次，固定开销结构决定的，不是参数能解决的。
 - **内存余量偏紧。** 111/121 GiB 常驻，想加第二个模型必须先解决这件事。
 - **单机单点。** 所有 Agent 都指向它，它挂了就全部回退订阅 API，而这个回退目前是手动切换。
-- **一个上游的端口写错（8000 应为 8080）。** 已定位，修复清单在仓库里，决定暂不执行。
 
-## 如果只抄三条
+## 验收到哪一步
 
-1. **先测容量再写宣传。** 从引擎自己的调度日志里统计真实并发吞吐，别把 `max-num-seqs` 当 SLA。
-2. **超时报错先查客户端。** 那一天 104 次"超时"里绝大部分是本地排队超时直接拒绝，请求根本没出门。
-3. **思考档位一定显式映射，并承认映射后的等价性损失。** 透传换来的是 400，映射换来的是"界面显示八档、实际三档"——至少后者是可控的。
-
----
-
-*本文中的主机地址、模型权重来源与上游供应商名称已做脱敏处理，具体环境不具指代。*
+256K 是引擎窗口，250046 个输入 token 的三处标记都读到了。单路中位吞吐 28.3 token/s，两路合计 40.9 token/s。两类客户端通过端到端验收。重会话压缩、三路持续并发和故障后自动切换，仍需分别测。

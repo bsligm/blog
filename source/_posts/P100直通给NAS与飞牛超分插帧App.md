@@ -1,7 +1,7 @@
 ---
 title: 把 P100 直通给 NAS：顺手做了一个超分插帧的飞牛 App
 date: 2026-10-15 21:00:00
-updated: 2026-11-21 11:00:00
+updated: 2026-11-23 17:30:00
 tags:
   - P100
   - DDA
@@ -11,43 +11,24 @@ tags:
 categories:
   - 基础设施
   - 系统维护
-keywords: P100, DDA, Direct Device Assignment, 飞牛 fnOS, 超分, 插帧, FFP, appcenter, GPU 直通, NAS
-description: 飞牛 NAS 里一张无风扇 Tesla P100 16G：直通选 DDA 不选 vfio；顺手做了个一键超分 + 插帧的飞牛 App，把应用账号预检、SQLite 单并发调度、"分片检查点 + 成品解码验收"两层验收的设计记下来，以及 4K 插帧压不满 60fps 的实测边界。
+keywords: P100, DDA, Direct Device Assignment, 飞牛 fnOS, 超分, 插帧, appcenter, GPU 直通, NAS
+description: "用 Hyper-V DDA 给飞牛 NAS 直通 Tesla P100，再把超分与插帧接入应用界面。记录目录授权、单 GPU 队列和成品回读怎么落到代码里。"
 cover: /img/cover/p100-ffd.jpg
 toc: true
 copyright: true
 ---
 
-NAS 里塞了一张无风扇 Tesla P100 16G，想让老片源在文件管理器里点一下就能超分、插帧——之前每次都是手动跑脚本、盯终端等完成。NAS 跑飞牛（fnOS，国产 NAS 系统，底层 Debian），是 Windows Hyper-V 虚拟机。这张卡原本给视频处理用，后来又被家里知识库（WeKnora，自托管语义知识库，做文档解析、向量嵌入、摘要）拿去当嵌入池，"一张卡两个主人"成了新常态。
+给 NAS 里的老片做插帧，最烦的是跑完才发现结果写不进去。我原来用脚本处理，后来给飞牛做了应用界面，直接选片源、看成品路径，失败的任务也能回到明确状态。算力来自一张 Tesla P100 16 GB。飞牛本来就跑在 Hyper-V 虚拟机里，我把这张卡直接分配给它。
 
-直通方式结论先放：**选 DDA，不选 vfio**。这张卡定位是"常驻低负载推理"，判定标准不是"隔离多彻底"，而是"系统升级要动几次启动链"。
+## 为什么选 Hyper-V DDA
 
-## 直通选型：DDA 不是"更简单"，是更便宜
+Discrete Device Assignment（DDA）把整块 PCIe 设备交给指定 Hyper-V 虚拟机。Linux 宿主用 `vfio-pci` 是另一条部署路线。维持现有 Hyper-V 宿主意味着不用为这张卡迁移 NAS，也不用改来宾的启动参数。宿主失去对这张卡的使用权，之后的视频处理和嵌入负载都由来宾侧安排。
 
-Hyper-V 把 GPU 交给虚拟机有两条路：vfio-pci（Linux 宿主常见的整卡绑定方案）与 DDA（Direct Device Assignment，Hyper-V 的 GPU 直接分配，卡从宿主摘掉整卡划给虚拟机，来宾装原生驱动）。
-
-| 方案 | 机制 | 优点 | 代价 |
-| --- | --- | --- | --- |
-| vfio-pci | 整卡绑定 vfio 驱动（Linux 宿主路线） | 隔离彻底 | 要改启动参数、绑 IOMMU 组，NAS 系统升级时容易被打回 |
-| DDA | Hyper-V 内核态透传，容器内原生 CUDA | 对系统侵入小，升级友好 | 隔离性弱于 vfio，同机其他进程可见该卡 |
-
-拆开选 DDA 的理由：不是机制更简单，而是 vfio 的代价在这个环境里摊不平——NAS 系统盘数据盘合一，vfio 路线要动 GRUB 参数和 initramfs，每次系统大升级都是一次"直通还能不能活"的重新验证；这张卡消费者只有一个（自研推理容器），不需要 vfio 级隔离。时间线说明：`nvidia-smi`、容器 CUDA 用户态链路是切换后几天补齐的验收，不算在切换当天。
-
-切换动作就是宿主侧三行 Hyper-V 命令 + 来宾侧内核驱动自识别：
-
-```powershell
-# 前置：飞牛 VM 关闭；动态内存 True→False（DDA 限制），启动内存固定 8GiB
-Disable-PnpDevice -InstanceID 'PCI\VEN_10DE&DEV_15F8&…' -Confirm:$false
-Dismount-VMHostAssignableDevice -InstanceID <同上> -Force
-Add-VMAssignableDevice -VMName 飞牛NAS -InstanceID <同上>
-# 来宾侧验证：lspci 显示 Kernel driver in use: nvidia
-```
-
-三行命令依次"停宿主使用、从宿主设备池摘下、挂给指定虚拟机"，来宾的 NVIDIA 驱动随后自己认领这张卡，`lspci` 里 `Kernel driver in use: nvidia` 就是直通成功的判据。全程没碰 GRUB 和 initramfs，这就是 DDA 不用动启动链的具体证据。
+验收按三步走。先确认来宾枚举到设备并绑定 NVIDIA 驱动，再从来宾查驱动与显存，最后进入推理运行环境验证 CUDA 实际可用。后两项是切换后补齐的。部署前的硬件资格、虚拟机配置和设备位置路径以 [Microsoft 的 DDA 文档](https://learn.microsoft.com/windows-server/virtualization/hyper-v/deploy/deploying-graphics-devices-using-dda) 为准。
 
 ## App 设计：把推理容器包成飞牛应用
 
-推理能力在容器里，NAS 用户要的是"在文件管理器里点一下"，所以做成标准飞牛 App——飞牛的应用分发机制叫 appcenter：外壳 Web UI，里子是调用推理容器的 REST 接口。功能范围克制：**超分（低清 → 1080p/4K）+ 插帧（30 → 60fps），二选一或串联**，不做风格化、去噪——99% 的需求就是把老片源提清晰度，做多了维护不起。
+最初只做超分、插帧和串联处理。应用从飞牛获取登录与目录授权，Web 界面负责选片和看进度，后端拆为任务网关、推理 worker 和 GPU 准入策略。公开版后来加了去噪等处理路径。仓库列出的兼容范围是 fnOS x86 + Tesla P100，输入范围为 SDR/CFR。
 
 ## 反直觉的坑：预检全绿，文件还是没写进去
 
@@ -61,8 +42,6 @@ def check_output_write(uid, output):
     app_acl(uid, output, True)
     fd = open_beneath(root, output, directory=True)
     try:
-        # 系统授权不等于 Linux ACL 允许应用账号写入；用与 worker 相同的
-        # effective 身份检查，而不是当前服务身份。
         if not os.access('.', os.W_OK | os.X_OK, dir_fd=fd, effective_ids=True):
             raise PermissionError('飞牛已授权，但应用账号无法写入成品目录；'
                                   '请在飞牛文件管理中检查该目录的应用写入权限')
@@ -70,13 +49,13 @@ def check_output_write(uid, output):
         os.close(fd)
 ```
 
-这段代码解决"谁能写"，不是"目录在不在"。飞牛里"系统授权"和"应用账号 ACL"是两层：授权界面点了允许，不等于跑任务的应用账号在 Linux ACL 里有写权限——预检用服务身份能写、worker 用应用账号写不进。所以不写临时文件验证（留脏文件），而是用 `os.access(..., effective_ids=True)` 以**与 worker 相同的应用账号有效身份**核 ACL 写权限——判定口径和执行身份一致；报错文案直接指到飞牛 UI 的具体操作。
+飞牛应用授权和 Linux 写权限分别检查。`check_output_write` 先核授权根和应用 ACL，再依当前进程的有效身份检查目录写入和进入权限。部署时要让这项检查与执行任务的账号权限一致。源码和报错见 [server.py](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/server.py#L126)。
 
 完整预检四项：源文件可读（开 fd + ffprobe）、输出目录可写（effective 身份检查）、GPU 显存余量闸门（只读 `nvidia-smi` 采样）、GPU 准入（策略列表内才放行，不满足置 `held` 排队，模型按任务加载）。预检不过直接告诉用户缺什么，不提交必然失败的任务再等二十分钟。
 
 ## 队列与验收：把"完成"的定义写进产品逻辑
 
-**任务队列严格单并发。** P100 一张卡，第二个任务排队，不做"小任务插队"——NAS 用户的心智是"我提交了，它排着，好了通知我"。实现全部是 SQLite + 一个 `break`：
+应用把视频任务放进 SQLite，一次只启动一个 worker。调度器按任务创建顺序检查候选任务，在启动前用锁重新核对状态。下面是调度过程的节选：
 
 ```python
 def scheduler():
@@ -95,12 +74,12 @@ def scheduler():
                 CURRENT = (row['id'], subprocess.Popen(argv, ...))
                 update(row['id'], 'running', '正在执行')
             # ... 等进程结束（每 2 秒复查权限与 guard.require_gpu）...
-            break            # 单并发的全部实现
+            break
 ```
 
-为什么不用消息队列？并发数是 1：队列本体就是 `jobs` 表的 `state` 字段，没有队列对象、没有信号量——单并发下，锁 + 状态机比队列框架更不易出 bug，重启后队列天然还在（表在）。`held`（资源恶化主动暂停，检查点保留）与 `queued`（排队等资源）恢复条件不同，held 恢复前要重新过预检。运行中每 2 秒复查 GPU 余量与目录授权，恶化就 kill 置 `held`——"视频等嵌入"的动态版本就是这段。
+同一张卡还会被嵌入服务使用，应用内单并发只约束视频任务。外部负载交给 GPU 准入规则处理，资源不足时可以保留任务，等下一轮重新检查。任务状态持久化在 `jobs` 表，视频分片能否续跑另由检查点决定。调度器和资源判断分别见 [server.py](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/server.py#L154) 与 [guard.py](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/guard.py#L75)。
 
-**验收标准写进产品逻辑，而且是两层。** NAS 环境里"容器说成功"和"文件真的在那、且内容对"之间隔着断电、半写几个状态，只看任务状态位会漏。第一层**分片级 SHA256 检查点**：长视频按分片编码，每片编码完先解码回读核帧数/分辨率/帧率，过了才把 SHA 写进检查点；续跑逐分片重算比对，对不上拒绝续跑——这是断电/重启后敢恢复的依据。第二层**成品级全量实际解码**：封装完不是数文件大小就交差：
+长片分片编码。每片先用解包计数核对包数，再检查尺寸和帧率，通过后写入 SHA-256。续跑时重新核对已提交的分片。整片封装完成后，再逐帧解码检查成品。这两处检查分别防止复用错误的中间产物，以及把损坏的最终文件标为完成。下面是检查过程的节选：
 
 ```python
 # 续跑前：逐分片 SHA 重算，任一不符即拒绝续跑
@@ -121,41 +100,16 @@ def scheduler():
             raise RuntimeError('最终实际解码/帧数/尺寸/帧率验收失败')
 ```
 
-所以"完成"= 成品真实落盘，且分片 SHA 检查点 + 成品实际解码（帧数/时长/分辨率/帧率/音轨字幕数与源一致）两层都过——不是"任务状态显示成功"，也不是简单"SHA 对得上"。检查点用 tmp + `os.replace` + fsync 原子提交，不会半写。
+分片哈希用来判断中间产物能否复用。最后一次解码核对的是成品的时长、帧数、尺寸与实际帧率，音轨及字幕则按任务预期检查。分片检查点和成品检查分别见 [worker.py 的分片校验](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/worker.py#L335) 与 [成品回读](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/worker.py#L377)。
 
 **错误路径不吞。** 非 JSON 错误（OOM、网关 HTML 页）归一成一条固定文案：JSON 带 `error` 就用它，不带就兜底；日志留末 1500 字节进任务状态。
 
 ## 显存规划：一张卡两个主人
 
-这张 P100 同时也是 [WeKnora 嵌入池](/2026/10/11/%E6%8A%8A%E5%AE%B6%E9%87%8C%E7%9A%84%E7%AE%97%E5%8A%9B%E5%85%A8%E6%8E%8F%E5%87%BA%E6%9D%A5WeKnora%E6%A8%A1%E5%9E%8B%E4%BF%9D%E9%9A%9C%E5%AE%9E%E5%BD%95/) 的主池——知识库每进出一份文档都要打嵌入，是卡上调用最频繁的负载。规则写死：嵌入模型常驻优先保；超分/插帧模型按需加载、用完即卸；冲突时视频任务等嵌入——嵌入被高频调用，卡它等于卡全站知识库。代价是视频任务多等十几秒模型加载，换来两边都不需要"暂停对方"的手动操作。
+这张 P100 当时也给 [WeKnora 嵌入池](/2026/10/11/%E6%8A%8A%E5%AE%B6%E9%87%8C%E7%9A%84%E7%AE%97%E5%8A%9B%E5%85%A8%E6%8E%8F%E5%87%BA%E6%9D%A5WeKnora%E6%A8%A1%E5%9E%8B%E4%BF%9D%E9%9A%9C%E5%AE%9E%E5%BD%95/) 用。嵌入需要及时响应，视频可以排队，因此视频模型按任务加载，资源冲突时先让嵌入继续跑。视频任务得承担一次重新加载的耗时，共用显卡期间也不承诺两个负载都能满速。
 
-## 版本节奏：主版本和热修不混
+## 已跑通的部分
 
-App 走 appcenter 升级，版本从 0.3.x 磨到 0.3.12 收口。踩过坑：官方升级包覆盖自研修改、热修和主版本升级互相打架。收口约定：**主版本走 appcenter 正式包，热修走独立补丁并登记适用版本**，不混。
+在当时的 P100 上，我跑通了从应用选片、检查输出路径、提交任务，到生成和回读成品的流程。4K 样片有过降档处理记录，未形成稳定 60 fps 的结论。目标输出帧率和处理速度是两个指标。要比较硬件或模型，还要在相同片源、模型、编码规格下同时记录两者。
 
-## 成果：手动处理 → App 一键 + SHA 验收，交付口径已定
-
-- 用户路径变了：超分/插帧从"手动跑脚本、盯终端"变成文件管理器点一下，预检四项（源文件可读、输出目录可写、显存余量、GPU 准入）在提交前把失败挡掉；
-- "完成"的定义已进产品逻辑：分片 SHA256 检查点 + 成品全量实际解码两层验收替代任务状态位；
-- P100 以 DDA 常驻 NAS，同一张卡同时供给知识库嵌入与超分插帧 App，冲突时视频等嵌入，两边不再需要手动"暂停对方"；
-- App 0.3.12 收口在用，主版本走 appcenter 正式包、热修走独立补丁并登记适用版本；4K 插帧按"1080p 插帧满帧、4K 插帧降帧可用"交付，4K 满帧率明确要等换卡。
-
-## 未闭环清单
-
-| 事项 | 状态 |
-| --- | --- |
-| 4K 插帧 60fps | 未达成（峰值 50 多帧）；交付口径：1080p 插帧满帧、4K 插帧降帧可用 |
-| 换卡 | 未定，4K 插帧提到满帧率的唯一路径 |
-| vfio 替代方案 | 未做，当前单消费者，隔离需求不成立 |
-
-## 小结
-
-P100 直通和这个 App 都没有高难动作。真正花时间是文档不写的部分：直通方式对系统升级的容忍度、"成功"和"文件落盘"在 NAS 环境是两个状态、官方升级包覆盖自研修改。
-
-只留一条经验：**NAS 上跑推理，先定义"完成"——分片 SHA 检查点 + 成品实际解码两层都过，不是任务状态位。**
-
-项目代码：[opsbsligm/fnos-video-enhance](https://github.com/opsbsligm/fnos-video-enhance)。
-
----
-
-卡型号、显存数字与 App 版本号取自当时现场记录；DDA 行为未经飞牛大升级后二次复测，仅作口径参考。
+私人环境里曾遇到整包升级覆盖热修，后来把热修绑定到具体应用版本。本文对应公开源码的版本号是 [0.3.12](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/version.py#L2)。[项目仓库](https://github.com/opsbsligm/fnos-video-enhance)提供源码、打包和测试脚本，公开仓未附 `.fpk` 安装包、模型权重或运行包。飞牛跨大版本升级后的直通表现仍待复测。

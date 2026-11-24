@@ -22,7 +22,7 @@ copyright: true
 
 片子都在 NAS 的共享目录里，一次处理有时要好几个小时。我想从网页选完就让它去跑。跑到一半目录权限变了得停，服务重启要能找到上次做到哪，最后还得打开成品确认能播。后面的调度和检查主要是为这几件事加的。
 
-先说实际交付。P100 真机上跑通了从选片、提交到生成并回读成品的路径。一段 1080p24 修复样片输出 48 帧、耗时 162.8 秒，保持 1920×1080、24 fps，逐帧解码通过。另有一次 4K 长片重启后能续跑，计数继续增长，但当时还没拿到最终成品。这两个样本分别验证输出和恢复，不能推导出 4K 实时处理能力。 [1080p24 样片验收记录](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/README.txt#L87)
+先说实际交付。P100 真机上跑通了从选片、提交到生成、再到成品确认的路径。一段 1080p24 修复样片输出 48 帧、耗时 162.8 秒，保持 1920×1080、24 fps，逐帧解码通过。另有一次 4K 长片重启后能续跑，计数继续增长，但当时还没拿到最终成品。一个样本验输出，一个验恢复，4K 实时处理能力仍是未知。 [1080p24 样片验收记录](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/README.txt#L87)
 
 ## 为什么选 Hyper-V DDA
 
@@ -36,7 +36,7 @@ Discrete Device Assignment（DDA）把整块 PCIe 设备交给指定 Hyper-V 虚
 
 超分改变画面尺寸，插帧增加时间轴上的画面数。两者都做时，先在源分辨率插帧，再把结果交给超分，避免插帧阶段先处理放大后的像素。SDR 表示标准动态范围，CFR 表示恒定帧率。这个版本的预检会把输入规格和所选模式送进同一份处理计划，界面可以在排队前把不支持的原因告诉用户。实现入口是 [任务预检](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/server.py#L316)，各模式见 [项目 README](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/README.md)。
 
-从用户选片开始，请求先经过任务网关。网关负责授权、预检和记录任务，运行时不直接把整片交给一个常驻请求。调度器等到有资源才开 worker，worker 解码、调用模型、输出分片，再将成品封装和回读。这个拆分的好处在重启时最明显。打开页面可以重新读任务状态，处理进度则从已经验过的分片恢复。即使 UI 刷新丢了进度条，任务和视频工作目录仍有自己的记录。
+从用户选片开始，请求先经过任务网关。网关负责授权、预检和记录任务，运行时不直接把整片交给一个常驻请求。调度器等到有资源才开 worker，worker 解码、调用模型、输出分片，最后封装成品并做读取检查。这个拆分的好处在重启时最明显。打开页面可以重新读任务状态，处理进度则从已经验过的分片恢复。即使 UI 刷新丢了进度条，任务和视频工作目录仍有自己的记录。
 
 ## 反直觉的坑：预检全绿，文件还是没写进去
 
@@ -57,7 +57,7 @@ def check_output_write(uid, output):
         os.close(fd)
 ```
 
-飞牛应用授权和 Linux 写权限分别检查。`check_output_write` 先核授权根和应用 ACL，再依当前进程的有效身份检查目录写入和进入权限。部署时要让这项检查与执行任务的账号权限一致。源码和报错见 [server.py](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/server.py#L126)。
+飞牛应用授权和 Linux 写权限是两回事。`check_output_write` 先核授权根和应用 ACL，再依当前进程的有效身份检查目录写入和进入权限。部署时要让这项检查与执行任务的账号权限一致。源码和报错见 [server.py](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/server.py#L126)。
 
 前端提交之前读的是源文件规格、处理计划和成品目录。源文件先通过授权路径打开，再由 ffprobe 检查；成品默认放到原片旁边，回包显式带上 `output_dir` 和 `output_writable`。这样可以让用户在生成任务前修目录权限。进入队列后，调度器还要重新看 GPU 准入和资源余量。这两步分开后，一次短时显存不足也不会被误报成片源本身不受支持。
 
@@ -85,9 +85,9 @@ def scheduler():
             break
 ```
 
-同一张卡还会被嵌入服务使用，应用内单并发只约束视频任务。外部负载交给 GPU 准入规则处理，资源不足时可以保留任务，等下一轮重新检查。任务状态持久化在 `jobs` 表，视频分片能否续跑另由检查点决定。调度器和资源判断分别见 [server.py](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/server.py#L154) 与 [guard.py](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/guard.py#L75)。
+同一张卡还会被嵌入服务使用，应用内单并发只针对视频任务，管不到它。外部负载交给 GPU 准入规则处理，资源不足时可以保留任务，等下一轮重新检查。任务状态持久化在 `jobs` 表，视频分片能否续跑另由检查点决定。调度器和资源判断见 [server.py](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/server.py#L154) 与 [guard.py](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/guard.py#L75)。
 
-长片分片编码。每片先用解包计数核对包数，再检查尺寸和帧率，通过后写入 SHA-256。续跑时重新核对已提交的分片。整片封装完成后，再逐帧解码检查成品。这两处检查分别防止复用错误的中间产物，以及把损坏的最终文件标为完成。
+长片分片编码。每片先用解包计数核对包数，再检查尺寸和帧率，通过后写入 SHA-256。续跑时重新核对已提交的分片。整片封装完成后，再逐帧解码检查成品。前者防止复用错误的中间产物，后者防止把损坏的最终文件标为完成。
 
 加最后一层检查是因为早期插帧样片的元数据都对，重新封装后却报 H.264 码流解析错误。我把模型移出复现，只保留 FFmpeg 重封装，确认问题仍在，才去修码流格式转换。原任务改记失败。后来的样片需要逐帧解码无错才能算通过。下面是检查过程的节选：
 
@@ -110,7 +110,7 @@ def scheduler():
             raise RuntimeError('最终实际解码/帧数/尺寸/帧率验收失败')
 ```
 
-分片哈希用来判断中间产物能否复用。最后一次解码核对的是成品的时长、帧数、尺寸与实际帧率，音轨及字幕则按任务预期检查。分片检查点和成品检查分别见 [worker.py 的分片校验](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/worker.py#L335) 与 [成品回读](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/worker.py#L377)。
+分片哈希用来判断中间产物能否复用。最后一次解码核对的是成品的时长、帧数、尺寸与实际帧率，音轨及字幕则按任务预期检查。分片检查点和成品检查见 [worker.py 的分片校验](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/worker.py#L335) 与 [成品检查](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/worker.py#L377)。
 
 **错误路径不吞。** 非 JSON 错误（OOM、网关 HTML 页）归一成一条固定文案：JSON 带 `error` 就用它，不带就兜底；日志留末 1500 字节进任务状态。
 
@@ -122,9 +122,9 @@ def scheduler():
 
 ## 已跑通的部分
 
-在当时的 P100 上，我跑通了从应用选片、检查输出路径、提交任务，到生成和回读成品的流程。4K 样片有过降档处理记录，未形成稳定 60 fps 的结论。目标输出帧率和处理速度是两个指标。要比较硬件或模型，还要在相同片源、模型、编码规格下同时记录两者。
+在当时的 P100 上，我跑通了从应用选片、检查输出路径、提交任务，到生成和成品检查的流程。4K 样片有过降档处理记录，未形成稳定 60 fps 的结论。目标输出帧率和处理速度是两个指标。要比较硬件或模型，还要在相同片源、模型、编码规格下同时记录两者。
 
-有一轮 4K 长片在应用中心重启后被标为失败，检查点仍在。恢复任务后，计数从 33,936 增到 33,984，说明 worker 又开始处理。那份记录收尾时，整片尚未完成，成品回读和抽帧目检也未完成。我把这次结果记作恢复成功，成品验收留空。
+有一轮 4K 长片在应用中心重启后被标为失败，检查点仍在。恢复任务后，计数从 33,936 增到 33,984，说明 worker 又开始处理。那份记录收尾时，整片尚未完成，成品没打开确认，抽帧目检也没做。我把这次结果记作恢复成功，成品验收留空。
 
 我把界面的提示做成三种。CPU 预览用缩小的输入跑流程，GPU 样片用原尺寸处理一小段，整片跑完才显示成品的尺寸、帧率和时长。看风格、试设置，用样片省时间。音轨、封装和长片用时得等整片。想顺代码看，从预检一路读到启动 worker，再看成品检查怎样写回任务。[成品检查](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/worker.py#L374) · [三种结果的界面提示](https://github.com/opsbsligm/fnos-video-enhance/blob/4d15a89e6c7f/src/server.py#L222)
 

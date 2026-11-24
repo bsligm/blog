@@ -14,9 +14,9 @@ toc: true
 copyright: true
 ---
 
-2023 年用 runfile 装过一套 NVIDIA 驱动和 CUDA Toolkit，主要是固定当时用的版本。驱动在宿主，应用用到的 CUDA 库也可能随容器或框架一起装。查环境时记一下各处实际读到的版本。
+2023 年用 runfile 装过一套 NVIDIA 驱动和 CUDA Toolkit，目的是固定当时用的版本。驱动在宿主，应用用到的 CUDA 库也可能随容器或框架一起装。查环境时把各处实际版本都记下来。
 
-当时用 runfile 是为了固定版本。复用这份经验时，先按目标 GPU、发行版、内核和负载核对支持范围，再选镜像、包管理器或 runfile。后来的 [DGX Spark 推理环境](/2026/11/19/DGX-Spark-vLLM部署与多Agent接入/) 与 [PVE GPU 虚拟化](/2026/11/19/PVE双宿主机与GPU切分实录/) 还要核对容器架构或宿主与来宾驱动，不能直接套这里的命令。
+当时用 runfile 是为了固定版本。复用这份经验时，先按目标 GPU、发行版、内核和负载核对支持范围，再选镜像、包管理器或 runfile。后来的 [DGX Spark 推理环境](/2026/11/19/DGX-Spark-vLLM部署与多Agent接入/) 与 [PVE GPU 虚拟化](/2026/11/19/PVE双宿主机与GPU切分实录/) 还要核对容器架构或宿主与来宾驱动，命令不能照搬。
 
 ## 准备
 
@@ -70,11 +70,11 @@ nvidia-smi
 
 ## 安装 CUDA 工具包
 
-先用 `nvidia-smi` 读驱动版本，再按要运行的 CUDA 应用或框架查最低驱动要求。界面上的 `CUDA Version` 是驱动报告的支持版本，不代表已装 Toolkit，也不能替代 [NVIDIA 的次版本兼容规则](https://docs.nvidia.com/deploy/cuda-compatibility/latest/minor-version-compatibility.html)。
+先用 `nvidia-smi` 读驱动版本，再按要运行的 CUDA 应用或框架查最低驱动要求。界面上的 `CUDA Version` 是驱动报告的支持版本，不代表已装 Toolkit；选型还得回到 [NVIDIA 的次版本兼容规则](https://docs.nvidia.com/deploy/cuda-compatibility/latest/minor-version-compatibility.html)。
 
 ![CUDA 版本兼容性检查](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202311091241712.png "CUDA版本兼容性检查")
 
-到[CUDA Toolkit Archive](https://developer.nvidia.com/cuda-toolkit-archive)选版本：
+到 [CUDA Toolkit Archive](https://developer.nvidia.com/cuda-toolkit-archive) 选版本：
 
 ![CUDA 版本选择页面](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202311091241098.png "CUDA版本选择页面")
 
@@ -168,13 +168,13 @@ mokutil --sb-state     # 确认 Secure Boot 状态
 
 ### 2. CUDA 版本不匹配
 
-先对照兼容矩阵、应用实际加载的运行时以及首次失败的错误，再决定调整驱动或运行时。容器里的 CUDA 库版本与宿主 `nvcc -V` 可能不同，两边都要读回。
+先对照兼容矩阵、应用实际加载的运行时以及首次失败的错误，再决定调整驱动或运行时。容器里的 CUDA 库版本与宿主 `nvcc -V` 可能不同，两边都要看。
 
 ### 3. 安装后 `nvcc` 找不到
 
 通常是环境变量未生效或路径未收录：`source ~/.bashrc` 后确认 `echo $CUDA_HOME` 指向实际安装目录；依赖动态链接器的话确认 `/etc/ld.so.conf.d/cuda.conf` 存在、重跑 `sudo ldconfig`，用 `ldconfig -p | grep cudart` 验证。
 
-## 总结
+## 收尾检查
 
 宿主上用 `nvidia-smi` 看卡和驱动，`nvcc -V` 查当前在用的编译器。项目在容器里就进容器跑最小算例。一些设备和动态库问题到这一步才看得见。当年的笔记留了安装和版本检查，算例输出没有留。
 

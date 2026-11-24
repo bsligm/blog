@@ -50,9 +50,11 @@ private func scanBus() {
 
 我给每轮扫描留了个编号。比如扫到一半拔设备、切去别页又回来，旧回调这时才交结果，界面就可能把拔掉的设备画回来。回调先检查页面和编号，旧结果丢掉。页面还开着就补扫一次。VID/PID 只够识别厂商和产品类型，要认同型号中的某一台，还得看设备自己的标识。[设备页扫描](https://github.com/opsbsligm/moonlight-macos-enhanced/blob/cc6aa76f1459/Limelight/macOS/ViewControllers/SettingsDevicesPane.swift#L639)
 
-设备页其实收两种异步结果。总线扫描读的是这台 Mac 的设备。远端主机检查读的是当前选中主机的状态。切主机时，本机 USB 枚举的意义没变，旧主机的检查结果却已经不能用。所以代码分别保存 `busScanGeneration` 和 `hostCheckGeneration`，发布主机结果前另外核对还是不是同一台主机。回归时我把场景拆成拔插、切页和切主机，分别观察设备行是否消失、旧扫描会不会覆盖新列表、上一个主机的诊断状态会不会串过来。 [主机检查的发布条件](https://github.com/opsbsligm/moonlight-macos-enhanced/blob/cc6aa76f1459/Limelight/macOS/ViewControllers/SettingsDevicesPane.swift#L621)
+设备页收两种异步结果。总线扫描读的是这台 Mac 的设备，远端主机检查读的是当前选中主机的状态。切主机时，本机 USB 枚举的意义没变，旧主机的检查结果却已经不能用。所以代码分别保存 `busScanGeneration` 和 `hostCheckGeneration`，发布主机结果前再核对还是不是同一台主机。
 
-验证时可以把旧扫描的结果故意放到切页之后再返回。若它被丢弃，界面仍可见时应等一次补扫，以新快照为准。切主机则看两件事：远端诊断随主机变，本机 USB 行仍来自本机快照。这样两条路径可以分别追问到代码。它们属于设备诊断，主机侧实际接管 USB 的重定向仍处于冻结状态。
+验证时我把旧扫描的结果故意放到切页之后再返回，若它被丢弃，界面仍可见时应等一次补扫，以新快照为准。回归时我把场景拆成拔插、切页和切主机，逐层观察设备行是否消失、旧扫描会不会覆盖新列表、上一个主机的诊断状态会不会串过来。 [主机检查的发布条件](https://github.com/opsbsligm/moonlight-macos-enhanced/blob/cc6aa76f1459/Limelight/macOS/ViewControllers/SettingsDevicesPane.swift#L621)
+
+切主机则看两件事：远端诊断随主机变，本机 USB 行仍来自本机快照。这样两条路径各自追问到代码。它们属于设备诊断，主机侧实际接管 USB 的重定向仍处于冻结状态。
 
 当串流断开要回头排查时，会话摘要按低频事件保留已写入的状态。异常退出可能只留下不完整的末条记录，回读采用能解析的事件。分享诊断材料前还需要单独脱敏。
 

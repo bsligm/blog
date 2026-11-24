@@ -1,5 +1,5 @@
 ---
-title: "给 CrossOver 换 GPTK 组件，失败时留下了什么"
+title: "CrossOver Preview 与 GPTK 3 Beta 的更新试验"
 date: 2025-09-09 10:00:00
 updated: 2026-11-23 22:35:00
 tags:
@@ -12,16 +12,16 @@ categories:
   - 系统运维
   - 游戏优化
 keywords: macOS 26 Beta, CrossOver Preview, GPTK 3, 兼容性评估, 文件校验, 失败恢复
-description: "2025 年拿 CrossOver Preview 和 GPTK 3 beta 做兼容性试验。这篇回头看目录改名、复制失败和回到旧版各走到了哪。"
+description: "记录 2025 年那版兼容性测试，重点是复制失败后备份和应用目录的状态。"
 cover: /img/cover/crossover-gptk.jpg
 toc: true
 copyright: true
 ---
 
 
-2025 年 9 月，我在 macOS 26 测试版上拿 CrossOver Preview 试游戏。CrossOver 是 Wine 兼容工具，Apple 的 GPTK 则提供移植和评估工具。我写过一个脚本，在固定的预览版组合里替换应用包和用户容器中的对应组件。最值得回头看的，是失败以后两处目录各剩下什么。
+2025 年 9 月用 macOS 26 测试版、CrossOver Preview 和 GPTK 3.0 beta 3 试 Windows 游戏。那时写了个脚本换组件，一处在应用包里，另一处在用户容器里。失败以后，两处留下的东西不一定相同。
 
-本文只复盘当时的 **macOS 26 测试版 + CrossOver Preview + GPTK 3.0 beta 3** 组合。后续版本的安装结构、授权范围与签名要求需要按各自的官方资料核对。这里没有给其他版本或受管终端做过等价验收。 [Apple Game Porting Toolkit](https://developer.apple.com/games/game-porting-toolkit/)
+下面说的都是那一版组合。受管终端和其他版本没跑过，后面换版本时要再查安装结构、授权和签名要求。[Apple Game Porting Toolkit](https://developer.apple.com/games/game-porting-toolkit/)
 
 ## 当时为什么写脚本
 

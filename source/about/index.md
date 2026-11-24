@@ -5,22 +5,22 @@ type: "about"
 layout: "about"
 ---
 
-我叫李广明。入行时做企业 IT 和系统集成，现在给具身智能团队搭推理环境。这里既有以前装域控的老笔记，也有最近怎么给模型分显卡的记录。
+我叫李广明。以前做系统集成，装过服务器和存储，也去过不少客户现场。现在给具身智能研发做基础设施，主要做 GPU、模型服务和日常运维。
 
-## 工作里
+## 工作
 
-边缘推理有次改完反而变慢，我把那轮撤了。后来换 GPU 切分，四路一起跑，模型调用均值从约 204 ms 到 115 ms。那轮还有别的改动，我把两轮条件都写进了{% post_link PVE双宿主机与GPU切分实录 "这篇 PVE 笔记" %}。
+最近部署了两台 PVE 宿主，一台供桌面和基础服务，一台跑边缘推理。为了看四路一起跑会等多久，我用同一套输入测了几轮。固定核的那一轮反而慢了，最后撤回。配置和数字在{% post_link PVE双宿主机与GPU切分实录 "PVE 部署笔记" %}。
 
-最近在试让 Agent 帮我做些运维。能先查哪台服务出了问题，能不能在拿到许可后改一条授权，做完谁来确认。我在{% post_link JumpServer企业版部署与健壮性工程 "JumpServer 上拿测试资产跑过一遍" %}。家里还有个比较直白的试验，{% post_link AI-Native的五个维度从接管到自运转 "让 Agent 在推理服务掉线时先查一轮" %}，现在还靠人启动调查。
+我也管过目录和堡垒机。{% post_link 三台域控部署实录 "三台域控" %}那篇记的是本地和云上的部署，{% post_link JumpServer企业版部署与健壮性工程 "JumpServer" %}里有一次连不上资产的故障。最近在试用 Agent 做运维，先让它读状态和找日志，再拿测试资产试授权。{% post_link AI-Native的五个维度从接管到自运转 "家里那套运维试验" %}里记了目前做到哪。
 
-## 家里也会折腾
+## 个人项目
 
-买了台 DGX Spark，我把手上的 Agent 接到本地模型，又在一份约二十五万 token 的输入里埋了三个标记，模型都找了回来。家里的知识库也要用 GPU，有时我想拿显卡测试串流，就得先把知识库的请求切走。{% post_link DGX-Spark-vLLM部署与多Agent接入 "DGX Spark 的试跑记录" %} · {% post_link 把家里的算力全掏出来WeKnora模型保障实录 "家里的知识库怎么挪算力" %}
+工作之外，我买了台 DGX Spark 跑本地模型，接了 Codex 和 WorkBuddy。家里的知识库有时要和视频任务借同一张显卡，我就把换机器的逻辑移到路由里。这两件事分别写在{% post_link DGX-Spark-vLLM部署与多Agent接入 "DGX Spark" %}和{% post_link 把家里的算力全掏出来WeKnora模型保障实录 "WeKnora" %}里。
 
-我还给飞牛 NAS 写了个{% post_link P100直通给NAS与飞牛超分插帧App "插帧和超分应用" %}。旧片跑到一半停了，能验过已经做完的分片，再接着做。另一个是{% post_link Moonlight的macOS增强版为串流开发而重构 "Mac 上的 Moonlight" %}，为了搞清拔掉的设备怎么又回到列表上，我去跟了一次后台扫描。
+我还给飞牛 NAS 写了个{% post_link P100直通给NAS与飞牛超分插帧App "超分和插帧应用" %}，也改过{% post_link Moonlight的macOS增强版为串流开发而重构 "Moonlight Mac 客户端" %}。
 
-博客里还有以前做企业 IT 和系统集成时留下的笔记。{% post_link "PowerStore 3.x的升级手顺" "做存储升级" %}、{% post_link 华为Atlas800服务器安装银河麒麟 "给 Atlas 800 装系统" %}、{% post_link AD搭建 "搭第一台域控" %}都写过。后来再做{% post_link 三台域控部署实录 "跨站点的三台域控" %}，才有机会把复制、DNS 和证书放在一起看。
+早年的笔记也留在这里。{% post_link "PowerStore 3.x的升级手顺" "PowerStore 升级" %}、{% post_link 华为Atlas800服务器安装银河麒麟 "Atlas 800 装机" %}、{% post_link AD搭建 "第一台域控" %}。
 
-如果你在做推理平台，或者在找做 AI Infra 的人，可以来聊。
+想聊 AI Infra 的工作，或者对文里的项目有问题，可以联系我。
 
 [GitHub](https://github.com/opsbsligm) · [博客源码](https://github.com/bsligm/blog) · [联系我](/contact/)

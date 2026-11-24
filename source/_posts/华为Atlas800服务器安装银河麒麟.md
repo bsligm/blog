@@ -1,5 +1,5 @@
 ---
-title: "给 Atlas 800 装银河麒麟，驱动和 CANN 得配哪一版"
+title: "Atlas 800 安装银河麒麟"
 date: 2023-08-07 16:00:00
 updated: 2026-11-23 22:35:00
 tags:
@@ -11,17 +11,17 @@ categories:
   - 基础设施
   - 服务器管理
 keywords: Atlas800, 银河麒麟, iBMC, NPU 驱动, CANN, aarch64
-description: "2023 年从 iBMC 挂镜像开始装一台昇腾服务器，按兼容表挑系统、固件、驱动和工具链。"
+description: "从 iBMC 挂镜像装系统，再配置昇腾驱动、固件和 CANN。"
 cover: /img/cover/atlas-kylin.jpg
 toc: true
 copyright: true
 ---
 
-2023 年给一台 Atlas 800 首次装机。Ascend 910 在 aarch64 宿主上，系统用银河麒麟。我从 iBMC 挂镜像开始，装系统之前就先翻了兼容表，内核、驱动、固件和 CANN 得能配成一套。
+2023 年这台 Atlas 800 是首次装机，aarch64 宿主配 Ascend 910，系统用银河麒麟。装机前先定好兼容的内核、驱动、固件和 CANN 版本，再用 iBMC 挂镜像。
 
 Atlas 800 有训练和推理等不同型号，不能只凭系列名下载软件包。动手前要确认完整机型、NPU 型号、OS 与内核、驱动和固件包、CANN 及所需框架版本。下文顺序限定于当时首次安装。已装设备的覆盖安装和升级要另看目标版本发布说明，例如 [昇腾安装指南](https://www.hiascend.com/doc_center/source/zh/canncommercial/70RC1/envdeployment/instg/instg_0019.html) 对部分设备区分首次安装的驱动优先与覆盖安装的固件优先。
 
-这篇与 [Ubuntu CUDA 驱动环境](/2023/11/09/Ubuntu安装英伟达驱动与CUDA/) 可以对照着读。工具链不同，但设备被枚举、算子能运行、目标业务可交付始终是不同的检查点。
+另一篇 [Ubuntu CUDA 驱动环境](/2023/11/09/Ubuntu安装英伟达驱动与CUDA/) 用的是 NVIDIA。两台机器装完以后我都会先查设备，再跑算例，最后用实际模型试。
 
 ## 通过 iBMC 安装银河麒麟
 

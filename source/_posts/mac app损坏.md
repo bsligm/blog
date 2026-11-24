@@ -1,5 +1,5 @@
 ---
-title: "Mac 提示「App 已损坏」，先看看下载的是哪一包"
+title: "macOS 的「App 已损坏」提示"
 date: 2021-04-29 11:00:00
 updated: 2026-11-23 22:35:00
 tags:
@@ -10,17 +10,17 @@ categories:
   - 桌面维护
   - 系统运维
 keywords: macOS, App损坏, Gatekeeper, spctl, xattr, 隔离属性, 隐私与安全性
-description: "从下载来源、文件摘要和代码签名查起，附几条只读命令。起于 2021 年的一次桌面支持记录。"
+description: "遇到安装报错时，先查下载来源、文件摘要和代码签名。"
 cover: /img/cover/macos-app-corrupt.jpg
 toc: true
 copyright: true
 ---
 
-做桌面支持时，遇到过 Mac 弹「App 已损坏，无法打开」。我先看用户从哪下的、版本是什么、机器用的哪版 macOS，再跟发布方的那份包对照。文件没下全、包被重新封装、版本不合适，后面的查法都不一样。
+2021 年做桌面支持时碰到的提示。先把报错原文、下载地址、应用版本和 macOS 版本记下来。有正式发布包和 SHA-256 的话，先拿同版文件对一次。
 
 ![MacOS App损坏提示](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/202509081512082.jpeg)
 
-本篇最早是 2021 年的桌面支持记录。macOS 的设置界面和安全机制持续变化。遇到不同提示，把安装来源和平台实际评估放在一起核，不按老截图操作。[Apple 关于安全打开 App 的说明](https://support.apple.com/en-us/102445)
+这些是我从 2021 年笔记里留下的检查项。遇到新版系统上的提示，可以先去 Apple 的页面对一下原话。[Apple 关于安全打开 App 的说明](https://support.apple.com/en-us/102445)
 
 ## 从发布方开始追文件
 

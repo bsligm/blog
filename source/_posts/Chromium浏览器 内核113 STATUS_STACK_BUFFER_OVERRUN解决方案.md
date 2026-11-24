@@ -1,5 +1,5 @@
 ---
-title: "Chromium 113 更新后，部分办公电脑一开浏览器就退出"
+title: "Chromium 113 启动崩溃"
 date: 2023-05-18 11:00:00
 updated: 2026-11-23 22:35:00
 tags:
@@ -12,7 +12,7 @@ categories:
   - 基础设施
   - 桌面维护
 keywords: Chromium, Chrome, Edge, STATUS_STACK_BUFFER_OVERRUN, Exploit Protection, 硬件强制堆栈保护, 组策略
-description: "错误码是 STATUS_STACK_BUFFER_OVERRUN。我用正常和异常终端做对照，当时靠版本回退恢复访问。"
+description: "部分终端更新后报 STATUS_STACK_BUFFER_OVERRUN，回退版本后恢复访问。"
 cover: /img/cover/chromium-crash.jpg
 toc: true
 copyright: true
@@ -20,7 +20,7 @@ copyright: true
 
 > **版本说明**：这是 2023 年 5 月 Chromium 113 的现场记录。系统、浏览器和终端组件的组合会影响结果，不能据此推断今天的产品版本。
 
-内核更新以后，有些办公电脑一点 Chrome 或 Edge 就退出，业务系统也跟着进不去。报错是 `STATUS_STACK_BUFFER_OVERRUN`。同一批机器里还有能正常打开的，先把它们留下来做对照，看看是哪个版本和哪一批终端同时出了问题。
+部分办公电脑升到 Chromium 113 后，Chrome 和 Edge 一启动就退出，报 `STATUS_STACK_BUFFER_OVERRUN`。同批还有能用的电脑，我拿两边的版本、系统补丁和策略做对照。
 
 ## 先把异常码和根因拆开
 
@@ -30,7 +30,7 @@ copyright: true
 
 ## 只读收集一次故障时间窗
 
-下面是从应用日志定位时间窗的示意。输出只选了时间、事件号和来源。对应的故障进程、模块与转储在授权环境内另行核对，公开文章不携带原始日志。
+下面只从应用日志取时间、事件号和来源。知道是哪一段以后，再到受控环境查故障进程、模块和转储。
 
 ```powershell
 $windowStart = (Get-Date).AddHours(-2)

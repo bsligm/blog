@@ -1,5 +1,5 @@
 ---
-title: "两台 PVE 怎么分 GPU，四路推理又怎么测"
+title: "PVE 部署、GPU 切分与边缘推理调优"
 date: 2026-11-19 20:40:00
 updated: 2026-11-23 18:37:00
 tags:
@@ -12,15 +12,15 @@ categories:
   - 系统运维
   - 基础设施
 keywords: PVE 初始化部署, LACP bond, VLAN-aware bridge, ZFS refreservation, cloud-init 模板, vGPU profile, MIG 切分, SR-IOV, NUMA 绑定, CPU 亲和, CUDA Graph, VLA 推理延迟
-description: "L40S 用普通 vGPU，RTX PRO 6000 用 MIG。四路共卡的那次测试变快了，固定物理核的设置后来撤掉了。"
+description: "两台宿主分别用 L40S vGPU 和 RTX PRO 6000 MIG。附四路共卡的测量结果。"
 cover: /img/cover/pve-gpu-mig.jpg
 toc: true
 copyright: true
 ---
 
-两台 PVE 分给两类负载。L40S 跑桌面和基础服务，RTX PRO 6000 给具身智能模型研发用。先要把管理网、业务网和来宾模板铺好，再拿研发实际用的负载测。GPU 能分出去以后，我最想知道的是四路一起跑时，延迟落在哪一段。
+两台 PVE 宿主做的事不同。L40S 给桌面和基础服务分 vGPU，RTX PRO 6000 给具身智能研发跑边缘推理。下面是网络、存储和来宾模板的配置，后半篇是四路共用一张卡时测的延迟。
 
-目标场景是四路每 640 ms 提交一轮调用。普通 24Q 的四路共载样本里，均值接近 204 ms。我试了内存本地性、固定物理核和 MIG。绑核后迁移归零，P95 却更慢，我就撤了。换到 MIG 那轮快了不少，同一轮也换过内存放置，差值是整组配置一起变的结果。
+实际负载每 640 ms 提交一轮调用。用普通 24Q 时，四路共载的均值接近 204 ms。后面试了内存本地性、固定物理核和 MIG。固定核那轮迁移次数清零，P95 却变慢了，最后撤回。换 MIG 时内存放置也有变化，表里给的是两组完整配置的结果。
 
 本文的延迟来自离线模型测量。相机采集、RPC、动作平滑和派发都在测量范围之外。
 
@@ -96,7 +96,7 @@ L40S 机走 **mdev 分片**，虚拟机配置形如 `hostpci0: <PCI>,mdev=nvidia
 
 本次使用 RTX PRO 6000 Blackwell Server Edition。启动顺序是先准备 SR-IOV VF 和 vGPU Manager，再让来宾启动。启用混合规格前回读 GPU 空闲与 VF 状态，防止宿主重启后只恢复部分卡。宿主升级内核前检查目标内核的 DKMS 模块，完成后再调整启动项。
 
-下面是本次实验用到的配置名，读表时同时看分配方式。型号和规格见 [NVIDIA vGPU 参考](https://docs.nvidia.com/vgpu/latest/grid-vgpu-user-guide/virtual-gpu-types-grid-reference.html)。
+表里的 24Q 要结合分配方式看。规格可以对照 [NVIDIA vGPU 参考](https://docs.nvidia.com/vgpu/latest/grid-vgpu-user-guide/virtual-gpu-types-grid-reference.html)。
 
 | profile | 显存 | 说明 |
 | --- | --- | --- |

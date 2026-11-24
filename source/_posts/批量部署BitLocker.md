@@ -1,5 +1,5 @@
 ---
-title: "给一批办公机开 BitLocker，先确认出事能解锁"
+title: "在 AD 域内批量启用 BitLocker"
 date: 2023-02-22 11:00:00
 updated: 2026-11-23 22:35:00
 tags:
@@ -11,13 +11,13 @@ categories:
   - 基础设施
   - 安全管理
 keywords: BitLocker, 批量部署, AD域, 组策略, TPM 2.0, 恢复密钥
-description: "2023 年用测试 OU 推 BitLocker。加密进度、保护状态和目录里那条恢复信息，各查各的。"
+description: "2023 年的试点记录，涉及测试 OU、系统盘加密状态和向 AD DS 托管恢复信息。"
 cover: /img/cover/bitlocker.jpg
 toc: true
 copyright: true
 ---
 
-2023 年给办公机批量开 BitLocker，我想省掉逐台配置，还得保证电脑进了恢复状态时，能在目录里找到对应的恢复信息。先把几台机器放进测试 OU，再看批量策略能走到哪。早一点的{% post_link AD搭建 "域控安装笔记" %}写的是这套目录怎么搭起来的。
+2023 年用域策略给一批办公机开 BitLocker，先放几台进测试 OU。每台要确认系统盘的加密和保护状态，也要查当前保护器能不能在目录里找到对应的恢复信息。搭目录的过程见{% post_link AD搭建 "域控安装笔记" %}。
 
 > **版本说明**：文中保留当时的部署选择和已经暴露的问题。新的部署以 [Microsoft BitLocker 策略文档](https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/configure) 和现有设备管理平台为准。
 
@@ -52,7 +52,7 @@ Get-BitLockerVolume -MountPoint $env:SystemDrive |
 
 对 AD 域加入的系统盘，在“选择如何才能恢复受 BitLocker 保护的操作系统驱动器”的策略中，按组织要求配置恢复密码或密钥包，并启用 **恢复信息存入 AD DS 之前不启用 BitLocker**。恢复信息保存在目标计算机对象下，由获授权的恢复人员按设备与保护器标识核对。
 
-旧版有把控制台输出写到共享文本的做法。它扩大了恢复凭据的可读范围，也让目录对象以外多出一份难治理的副本，已从公开流程移除。公开版只记录设备范围、策略状态和验证结果。恢复密码、口令、导出记录与现场截图留在受控环境。
+老做法把控制台输出存到了共享文件。恢复信息后续应放在 AD DS 里，只有获授权的人能按设备查。部署记录里留下哪几台、用的策略和结果即可。
 
 若一台新设备一直没有出现恢复对象，先查实际生效的 GPO，再查域连接和写入目录的权限。测试 OU 中出现无法确认托管的设备时，暂停扩围。已有卷单独走受控补备或恢复核验，避免重新加密这一根本无关的动作。
 

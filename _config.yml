@@ -4,8 +4,8 @@
 
 # Site
 title: 李广明的技术博客
-subtitle: 'AI 基础设施随手记'
-description: '我是李广明，做 AI 基础设施。这里记工作里遇到的事，也记回家后折腾的项目。'
+subtitle: 'AI 基础设施笔记'
+description: '李广明的个人博客。写模型推理、系统运维和自己做的项目。'
 keywords: 'AI Infra, 模型推理, 系统运维, 家庭实验室'
 author: 李广明
 language: zh-CN

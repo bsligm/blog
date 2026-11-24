@@ -1,5 +1,5 @@
 ---
-title: "借一个 Windows Sandbox 管老打印机"
+title: "用 Windows Sandbox 运行旧打印机工具"
 date: 2023-03-04 11:00:00
 updated: 2026-11-23 22:35:00
 tags:
@@ -10,13 +10,13 @@ categories:
   - 基础设施
   - 安全管理
 keywords: Windows沙盒, Sandbox, 安全隔离, 虚拟化, Flash Player, IE浏览器
-description: "一次 IC 卡维护用到了旧浏览器和插件。我把工具放进临时桌面，另外留了一个离线只读的配置例子。"
+description: "2023 年一次 IC 卡维护，附离线只读的沙盒配置。"
 cover: /img/cover/windows-sandbox.jpg
 toc: true
 copyright: true
 ---
 
-2023 年帮忙做一次 IC 卡维护，旧打印机后台还要用旧浏览器和插件。我只为这次操作开了个 Windows Sandbox，日常办公留在宿主。用到的网络和目录得另外管，尤其是共享目录，关窗口也不会把写进宿主的东西收回来。长期运行应换成厂商支持的管理入口。
+一次给老打印机做 IC 卡维护，后台得用旧浏览器和插件。我开了一次 Windows Sandbox 跑工具。那次要连打印机后台，后面另附一个离线例子，专门看目录只读和关窗后怎么清理。
 
 ![Windows 沙盒架构](https://picturebed99.oss-cn-shanghai.aliyuncs.com/img/image-20230303131900199.png)
 
@@ -35,7 +35,7 @@ Windows Sandbox 提供临时桌面。会话结束后，沙盒里安装的应用�
 
 ## 验一份离线只读配置
 
-下面是单独准备的离线示例。宿主准备一个仅含普通样例文件的 `C:\SandboxInput`。在沙盒的 `C:\Input` 检查文件可读，尝试创建新的演示文件时则应收到拒绝。用这两个结果验映射与写权限。
+离线例子里，宿主的 `C:\SandboxInput` 只放普通样例文件。进沙盒后从 `C:\Input` 读一遍，再试着写一份新文件。预期是读得到，写入被拒。
 
 ```xml
 <Configuration>

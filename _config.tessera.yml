@@ -146,6 +146,8 @@ footer:
 
 # 侧栏卡片：做减法（公告/近期文章/统计卡关闭，与首页内容重复）
 aside:
+  card_author:
+    description: 做 AI 基础设施，主要是具身智能研发环境和模型推理。
   card_announcement:
     enable: false
   card_recent_post:
